@@ -76,13 +76,14 @@ services:
 
   mailpit:
     image: axllent/mailpit
-    ports:
-      - 8025:8025
-      - 1025:1025
+    #ports:
+    #  - 8025:8025
+    #  - 1025:1025
     profiles:
       - development
-    networks:
-      - web
+    network_mode: service:workers
+    # networks:
+    #  - web
 
   db:
     image: postgres:15.8
@@ -171,6 +172,9 @@ services:
     restart: always
     container_name: latitude-llm-gateway
     platform: linux/amd64
+    environment:
+      - GATEWAY_BIND_ADDRESS=0.0.0.0
+      - GATEWAY_BIND_PORT=8080
     profiles:
       - production
 
@@ -190,6 +194,9 @@ services:
     restart: always
     container_name: latitude-llm-workers
     platform: linux/amd64
+    ports:
+      - 8025:8025
+      - 1025:1025
     profiles:
       - production
 

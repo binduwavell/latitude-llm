@@ -101,6 +101,8 @@ services:
       - shared-storage:/app/apps/web/public/files:rw
     environment:
       - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
+    ports:
+      - '8081:8080'
     build:
       args:
         - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
