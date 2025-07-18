@@ -47,10 +47,10 @@ This guide explains how to set up a local instance of Latitude on your machine f
     - Copy any example environment files (e.g., `.env.example` to `.env`) and adjust necessary variables. For a standard local setup, defaults are often sufficient.
 
 5.  **Start Services with Docker Compose**:
-    This command starts the database, message queue, and other background services defined in `docker-compose.yml`.
+    This command starts the database, message queue, and other background services defined in `docker-compose.local.yml`.
 
     ```bash
-    docker compose up -d # Run in detached mode
+    docker compose -f docker-compose.local.yml --profile local up -d # Run in detached mode
     ```
 
     _Alternatively, if using Tmuxinator (recommended)_:
