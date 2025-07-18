@@ -46,6 +46,7 @@ docker compose --profile local -f docker-compose.local.yml up -d
 - **API Gateway**: `http://gateway.latitude.localhost`
 - **WebSocket Service**: `http://ws.latitude.localhost`
 - **Traefik Dashboard**: `http://traefik.latitude.localhost`
+- **Documentation**: `http://docs.latitude.localhost`
 - **Email Testing (Mailpit)**: `http://localhost:8025` (via workers service)
 
 #### Option 2: Hybrid Development Setup (Recommended for Active Development)
@@ -62,7 +63,7 @@ tmuxinator start
 **Manual Setup:**
 ```bash
 # Terminal 1: Start infrastructure services
-docker compose -f docker-compose.local.yml --profile dev up
+docker compose -f docker-compose.local.yml --profile development up
 
 # Terminal 2: Start all applications
 pnpm dev --filter='./apps/*'
