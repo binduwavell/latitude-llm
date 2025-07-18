@@ -74,16 +74,28 @@ services:
     networks:
       - web
 
-  mailpit:
+  mailpit-dev:
     image: axllent/mailpit
-    #ports:
-    #  - 8025:8025
-    #  - 1025:1025
+    ports:
+      - 8025:8025
+      - 1025:1025
     profiles:
       - development
+    network_mode: service:workers-local
+    networks:
+      - web
+
+  mailpit-local:
+    image: axllent/mailpit
+    profiles:
+      - local
+    network_mode: service:workers-local
+
+  mailpit:
+    image: axllent/mailpit
+    profiles:
+      - production
     network_mode: service:workers
-    # networks:
-    #  - web
 
   db:
     image: postgres:15.8
@@ -185,6 +197,9 @@ services:
       context: .
       dockerfile: apps/workers/docker/Dockerfile
     platform: linux/amd64
+    ports:
+      - 8025:8025
+      - 1025:1025
     profiles:
       - local
 
