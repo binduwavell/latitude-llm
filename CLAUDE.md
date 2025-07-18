@@ -38,7 +38,7 @@ There are two ways to run the development environment:
 
 **Commands:**
 ```bash
-docker compose --profile development --profile local -f docker-compose.local.yml up -d
+docker compose --profile local -f docker-compose.local.yml up -d
 ```
 
 **Access Points:**
@@ -62,7 +62,7 @@ tmuxinator start
 **Manual Setup:**
 ```bash
 # Terminal 1: Start infrastructure services
-docker compose up db redis mailpit
+docker compose -f docker-compose.local.yml --profile dev up
 
 # Terminal 2: Start all applications
 pnpm dev --filter='./apps/*'
