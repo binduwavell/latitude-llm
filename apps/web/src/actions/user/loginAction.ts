@@ -8,7 +8,7 @@ import { z } from 'zod'
 
 import { errorHandlingProcedure } from '../procedures'
 import { env } from '@latitude-data/env'
-import { NotFoundError } from '@latitude-data/constants/errors'
+import { NotFoundError, ForbiddenError } from '@latitude-data/constants/errors'
 import { setSession } from '$/services/auth/setSession'
 
 export const loginAction = errorHandlingProcedure
@@ -21,6 +21,10 @@ export const loginAction = errorHandlingProcedure
     { type: 'formData' },
   )
   .handler(async ({ input }) => {
+    if (env.DISABLE_EMAIL) {
+      throw new ForbiddenError('Email login is disabled. Please use Google authentication.')
+    }
+
     const { user } = await getUserFromCredentials(input).then((r) => r.unwrap())
 
     if (env.DISABLE_EMAIL_AUTHENTICATION) {

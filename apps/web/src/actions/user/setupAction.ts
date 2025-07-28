@@ -42,7 +42,7 @@ export const setupAction = errorHandlingProcedure
     { type: 'formData' },
   )
   .handler(async ({ input }) => {
-    if (env.DISABLE_EMAIL_AUTHENTICATION) {
+    if (env.DISABLE_EMAIL) {
       throw new ForbiddenError('Email signup is disabled. Please use Google authentication.')
     }
 
