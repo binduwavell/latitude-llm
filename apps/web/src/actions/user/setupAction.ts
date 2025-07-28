@@ -9,6 +9,8 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
 import { errorHandlingProcedure } from '../procedures'
+import { env } from '@latitude-data/env'
+import { ForbiddenError } from '@latitude-data/constants/errors'
 
 export const setupAction = errorHandlingProcedure
   .createServerAction()
@@ -41,6 +43,10 @@ export const setupAction = errorHandlingProcedure
     { type: 'formData' },
   )
   .handler(async ({ input }) => {
+    if (env.DISABLE_EMAIL_AUTHENTICATION) {
+      throw new ForbiddenError('Email signup is disabled. Please use Google authentication.')
+    }
+
     const result = await setupService(input)
     const { workspace, user } = result.unwrap()
 
