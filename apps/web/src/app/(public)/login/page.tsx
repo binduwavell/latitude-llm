@@ -8,6 +8,8 @@ import { isLatitudeUrl } from '@latitude-data/constants'
 import { Card, CardContent } from '@latitude-data/web-ui/atoms/Card'
 import { FocusHeader } from '@latitude-data/web-ui/molecules/FocusHeader'
 import { redirect } from 'next/navigation'
+import { env } from '@latitude-data/env'
+
 import LoginForm from './LoginForm'
 
 export const dynamic = 'force-dynamic'
@@ -43,7 +45,11 @@ export default async function LoginPage({
     >
       <Card background='light'>
         <CardContent standalone>
-          <LoginForm footer={<AuthFooter />} returnTo={returnTo} />
+          <LoginForm 
+            footer={<AuthFooter />} 
+	    returnTo={returnTo}
+            disableEmail={env.DISABLE_EMAIL}
+          />
         </CardContent>
       </Card>
     </FocusLayout>

@@ -3,6 +3,7 @@ import buildMetatags from '$/app/_lib/buildMetatags'
 import { FocusLayout } from '$/components/layouts'
 import { Card, CardContent } from '@latitude-data/web-ui/atoms/Card'
 import { FocusHeader } from '@latitude-data/web-ui/molecules/FocusHeader'
+import { env } from '@latitude-data/env'
 
 import SignupFooter from '$/app/(public)/setup/_components/SignupFooter'
 import SetupForm from './SetupForm'
@@ -45,6 +46,7 @@ export default async function SetupPage({
             companyName={companyName}
             footer={<AuthFooter />}
             returnTo={returnTo}
+            disableEmail={env.DISABLE_EMAIL}
           />
         </CardContent>
       </Card>

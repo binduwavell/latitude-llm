@@ -19,12 +19,14 @@ export default function SetupForm({
   companyName,
   footer,
   returnTo,
+  disableEmail = false,
 }: {
   footer: ReactNode
   email?: string
   name?: string
   companyName?: string
   returnTo?: string
+  disableEmail?: boolean
 }) {
   const { toast } = useToast()
   const { execute, isPending } = useLatitudeAction(setupAction)
@@ -44,63 +46,67 @@ export default function SetupForm({
     <form action={action}>
       <input type='hidden' name='returnTo' value={returnTo} />
       <FormWrapper>
-        <Input
-          autoFocus
-          required
-          name='name'
-          autoComplete='name'
-          label='Name'
-          placeholder='Jon Snow'
-          // @ts-expect-error
-          errors={errors?.name}
-          defaultValue={data?.name || name}
-        />
-        <Input
-          required
-          name='email'
-          autoComplete='email'
-          label='Email'
-          placeholder='jon@winterfell.com'
-          // @ts-expect-error
-          errors={errors?.email}
-          defaultValue={data?.email || email}
-        />
-        <Input
-          required
-          name='companyName'
-          label='Workspace Name'
-          placeholder='Acme Inc.'
-          // @ts-expect-error
-          errors={errors?.companyName}
-          defaultValue={data?.companyName || companyName}
-        />
-        <div className='flex flex-col gap-6'>
-          <Button fullWidth isLoading={isPending} fancy>
-            Create account
-          </Button>
+        {!disableEmail && (
+          <>
+            <Input
+              autoFocus
+              required
+              name='name'
+              autoComplete='name'
+              label='Name'
+              placeholder='Jon Snow'
+              // @ts-expect-error
+              errors={errors?.name}
+              defaultValue={data?.name || name}
+            />
+            <Input
+              required
+              name='email'
+              autoComplete='email'
+              label='Email'
+              placeholder='jon@winterfell.com'
+              // @ts-expect-error
+              errors={errors?.email}
+              defaultValue={data?.email || email}
+            />
+            <Input
+              required
+              name='companyName'
+              label='Workspace Name'
+              placeholder='Acme Inc.'
+              // @ts-expect-error
+              errors={errors?.companyName}
+              defaultValue={data?.companyName || companyName}
+            />
+            <div className='flex flex-col gap-6'>
+              <Button fullWidth isLoading={isPending} fancy>
+                Create account
+              </Button>
 
-          <div className='relative'>
-            <Separator />
-            <div className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'>
-              <div className='bg-background px-2'>
-                <Text.H6 color='foregroundMuted'>Or</Text.H6>
+              <div className='relative'>
+                <Separator />
+                <div className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'>
+                  <div className='bg-background px-2'>
+                    <Text.H6 color='foregroundMuted'>Or</Text.H6>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </>
+        )}
 
-          <Button variant='outline' fullWidth asChild>
-            <Link
-              href={
-                '/api/auth/google/start' +
-                (returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : '')
-              }
-              className='flex items-center gap-2'
-            >
-              <Icon name='googleWorkspace' />
-              <Text.H5>Continue with Google</Text.H5>
-            </Link>
-          </Button>
-        </div>
+        <Button variant='outline' fullWidth asChild>
+          <Link
+            href={
+              '/api/auth/google/start' +
+              (returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : '')
+            }
+            className='flex items-center gap-2'
+          >
+            <Icon name='googleWorkspace' />
+            <Text.H5>Continue with Google</Text.H5>
+          </Link>
+        </Button>
 
         {footer}
       </FormWrapper>
