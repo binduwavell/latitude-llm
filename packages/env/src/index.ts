@@ -220,6 +220,7 @@ export const env = createEnv({
     MAILGUN_EMAIL_DOMAIN: z.string().optional(),
     MAILGUN_MAILER_API_KEY: z.string().optional(),
     DISABLE_EMAIL_AUTHENTICATION: z.boolean().optional().default(false),
+    DISABLE_EMAIL: z.boolean().optional().default(false),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.union([z.string(), z.number()]).optional(),
     SMTP_SECURE: z.coerce.boolean().optional().default(true),
@@ -305,6 +306,7 @@ export const env = createEnv({
     OPT_OUT_ANALYTICS: process.env.OPT_OUT_ANALYTICS === 'true',
     DISABLE_EMAIL_AUTHENTICATION:
       process.env.DISABLE_EMAIL_AUTHENTICATION === 'true',
+    DISABLE_EMAIL: process.env.DISABLE_EMAIL === 'true',
     ENABLE_ALL_FLAGS: process.env.ENABLE_ALL_FLAGS === 'true',
     COPILOT_PROMPT_SIMULATE_TOOL_RESPONSES_PATH:
       process.env.COPILOT_PROMPT_SIMULATE_TOOL_RESPONSES_PATH ??
