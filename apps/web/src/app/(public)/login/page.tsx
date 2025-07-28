@@ -7,6 +7,7 @@ import { FocusLayout } from '$/components/layouts'
 import { getSession } from '$/services/auth/getSession'
 import { ROUTES } from '$/services/routes'
 import { redirect } from 'next/navigation'
+import { env } from '@latitude-data/env'
 
 import LoginForm from './LoginForm'
 
@@ -27,7 +28,10 @@ export default async function LoginPage() {
     >
       <Card background='light'>
         <CardContent standalone>
-          <LoginForm footer={<AuthFooter />} />
+          <LoginForm 
+            footer={<AuthFooter />} 
+            disableEmail={env.DISABLE_EMAIL}
+          />
         </CardContent>
       </Card>
     </FocusLayout>

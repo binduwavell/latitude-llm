@@ -15,9 +15,11 @@ import { Text } from '@latitude-data/web-ui/atoms/Text'
 export default function LoginForm({
   footer,
   returnTo,
+  disableEmail = false,
 }: {
   footer: ReactNode
   returnTo?: string
+  disableEmail?: boolean
 }) {
   const { toast } = useToast()
   const { isPending, error, executeFormAction } = useServerAction(loginAction, {
@@ -36,38 +38,42 @@ export default function LoginForm({
     <form action={executeFormAction}>
       <input type='hidden' name='returnTo' value={returnTo} />
       <FormWrapper>
-        <Input
-          autoFocus
-          name='email'
-          autoComplete='email'
-          label='Email'
-          placeholder='Ex.: jon@example.com'
-          errors={errors?.email}
-        />
-        <div className='flex flex-col gap-6'>
-          <Button fancy fullWidth isLoading={isPending && !error}>
-            Login
-          </Button>
+        {!disableEmail && (
+          <>
+            <Input
+              autoFocus
+              name='email'
+              autoComplete='email'
+              label='Email'
+              placeholder='Ex.: jon@example.com'
+              errors={errors?.email}
+            />
+            <div className='flex flex-col gap-6'>
+              <Button fancy fullWidth isLoading={isPending && !error}>
+                Login
+              </Button>
 
-          <div className='relative'>
-            <Separator />
-            <div className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'>
-              <div className='bg-background px-2'>
-                <Text.H6 color='foregroundMuted'>Or</Text.H6>
+              <div className='relative'>
+                <Separator />
+                <div className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'>
+                  <div className='bg-background px-2'>
+                    <Text.H6 color='foregroundMuted'>Or</Text.H6>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </>
+        )}
 
-          <Button variant='outline' fullWidth asChild>
-            <Link
-              href='/api/auth/google/start'
-              className='flex items-center gap-2'
-            >
-              <Icon name='googleWorkspace' />
-              <Text.H5>Continue with Google</Text.H5>
-            </Link>
-          </Button>
-        </div>
+        <Button variant='outline' fullWidth asChild>
+          <Link
+            href='/api/auth/google/start'
+            className='flex items-center gap-2'
+          >
+            <Icon name='googleWorkspace' />
+            <Text.H5>Continue with Google</Text.H5>
+          </Link>
+        </Button>
 
         {footer}
       </FormWrapper>
