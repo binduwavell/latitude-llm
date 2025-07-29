@@ -17,7 +17,6 @@ import {
   ProviderLogDto,
   Workspace,
 } from '../../browser'
-import { database } from '../../client'
 import { publisher } from '../../events/publisher'
 import { BadRequestError, UnprocessableEntityError } from '../../lib/errors'
 import { generateUUIDIdentifier } from '../../lib/generateUUID'
@@ -55,15 +54,14 @@ export async function runEvaluationV2<
     commit: Commit
     workspace: Workspace
   },
-  db = database,
+  transaction = new Transaction(),
 ) {
-  const resultsRepository = new EvaluationResultsV2Repository(workspace.id, db)
-  const result = await resultsRepository.findByEvaluatedLogAndEvaluation({
+  const resultsRepository = new EvaluationResultsV2Repository(workspace.id)
+  const findResult = await resultsRepository.findByEvaluatedLogAndEvaluation({
     evaluatedLogId: providerLog.id,
     evaluationUuid: evaluation.uuid,
   })
-
-  if (result.ok) {
+  if (findResult.ok) {
     return Result.error(
       new UnprocessableEntityError(
         'Cannot evaluate a log that is already evaluated for this evaluation',
@@ -73,7 +71,7 @@ export async function runEvaluationV2<
 
   const resultUuid = generateUUIDIdentifier()
 
-  const documentsRepository = new DocumentVersionsRepository(workspace.id, db)
+  const documentsRepository = new DocumentVersionsRepository(workspace.id)
   const document = await documentsRepository
     .getDocumentAtCommit({
       commitUuid: commit.uuid,
@@ -87,7 +85,7 @@ export async function runEvaluationV2<
     )
   }
 
-  const documentLogsRepository = new DocumentLogsRepository(workspace.id, db)
+  const documentLogsRepository = new DocumentLogsRepository(workspace.id)
   const documentLog = await documentLogsRepository
     .findByUuid(providerLog.documentLogUuid)
     .then((r) => r.unwrap())
@@ -158,25 +156,22 @@ export async function runEvaluationV2<
       }).then((r) => r.unwrap())
     }
 
-    value = (await typeSpecification.run(
-      {
-        metric: evaluation.metric,
-        resultUuid: resultUuid,
-        evaluation: evaluation,
-        actualOutput: actualOutput,
-        expectedOutput: expectedOutput,
-        conversation: conversation,
-        providerLog: providerLog,
-        documentLog: documentLog,
-        document: document,
-        dataset: dataset,
-        datasetLabel: datasetLabel,
-        datasetRow: datasetRow,
-        commit: commit,
-        workspace: workspace,
-      },
-      db,
-    )) as EvaluationResultValue // Note: Typescript cannot resolve conditional types including unbound type arguments: https://github.com/microsoft/TypeScript/issues/53455
+    value = (await typeSpecification.run({
+      metric: evaluation.metric,
+      resultUuid: resultUuid,
+      evaluation: evaluation,
+      actualOutput: actualOutput,
+      expectedOutput: expectedOutput,
+      conversation: conversation,
+      providerLog: providerLog,
+      documentLog: documentLog,
+      document: document,
+      dataset: dataset,
+      datasetLabel: datasetLabel,
+      datasetRow: datasetRow,
+      commit: commit,
+      workspace: workspace,
+    })) as EvaluationResultValue // Note: Typescript cannot resolve conditional types including unbound type arguments: https://github.com/microsoft/TypeScript/issues/53455
 
     if (
       !value.error &&
@@ -193,35 +188,38 @@ export async function runEvaluationV2<
     value = { error: { message: (error as Error).message } }
   }
 
-  return await Transaction.call(async (tx) => {
-    const { result } = await createEvaluationResultV2(
-      {
-        uuid: resultUuid,
-        evaluation: evaluation,
-        providerLog: providerLog,
-        commit: commit,
-        experiment: experiment,
-        dataset: dataset,
-        datasetRow: datasetRow,
-        value: value as EvaluationResultValue<T, M>,
-        workspace: workspace,
-      },
-      tx,
-    ).then((r) => r.unwrap())
+  return transaction.call(
+    async () => {
+      const { result } = await createEvaluationResultV2(
+        {
+          uuid: resultUuid,
+          evaluation: evaluation,
+          providerLog: providerLog,
+          commit: commit,
+          experiment: experiment,
+          dataset: dataset,
+          datasetRow: datasetRow,
+          value: value as EvaluationResultValue<T, M>,
+          workspace: workspace,
+        },
+        transaction,
+      ).then((r) => r.unwrap())
 
-    await publisher.publishLater({
-      type: 'evaluationV2Ran',
-      data: {
-        workspaceId: workspace.id,
-        evaluation: evaluation,
-        result: result,
-        commit: commit,
-        providerLog: providerLog,
-      },
-    })
-
-    return Result.ok({ result })
-  }, db)
+      return Result.ok({ result })
+    },
+    async ({ result }) => {
+      await publisher.publishLater({
+        type: 'evaluationV2Ran',
+        data: {
+          workspaceId: workspace.id,
+          evaluation: evaluation,
+          result: result,
+          commit: commit,
+          providerLog: providerLog,
+        },
+      })
+    },
+  )
 }
 
 export function isErrorRetryable(error: Error) {

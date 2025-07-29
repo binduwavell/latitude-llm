@@ -1,15 +1,14 @@
 import { LatitudeError } from '@latitude-data/constants/errors'
 import { and, eq } from 'drizzle-orm'
 import { DocumentTrigger, Workspace } from '../../browser'
-import { database } from '../../client'
 import { Result } from '../../lib/Result'
 import Transaction, { PromisedResult } from '../../lib/Transaction'
 import { documentTriggers } from '../../schema'
 import { buildConfiguration } from './helpers/buildConfiguration'
 import {
-  DocumentTriggerWithConfiguration,
-  IntegrationTriggerConfiguration,
-} from './helpers/schema'
+  InsertDocumentTriggerWithConfiguration,
+  InsertIntegrationTriggerConfiguration,
+} from '@latitude-data/constants/documentTriggers'
 import { DocumentTriggerType } from '@latitude-data/constants'
 import { updatePipedreamTrigger } from '../integrations/pipedream/triggers'
 
@@ -21,22 +20,22 @@ export async function updateDocumentTriggerConfiguration(
   }: {
     workspace: Workspace
     documentTrigger: DocumentTrigger
-    configuration: DocumentTriggerWithConfiguration['configuration']
+    configuration: InsertDocumentTriggerWithConfiguration['configuration']
   },
-  db = database,
+  transaction = new Transaction(),
 ): PromisedResult<DocumentTrigger> {
   if (documentTrigger.triggerType === DocumentTriggerType.Integration) {
     const preupdateResult = await updatePipedreamTrigger({
       workspace,
-      originalConfig: documentTrigger.configuration,
-      updatedConfig: configuration as IntegrationTriggerConfiguration,
+      trigger: documentTrigger,
+      updatedConfig: configuration as InsertIntegrationTriggerConfiguration,
     })
 
     if (!Result.isOk(preupdateResult)) return preupdateResult
     configuration = preupdateResult.unwrap()
   }
 
-  return await Transaction.call(async (tx) => {
+  return await transaction.call(async (tx) => {
     const result = await tx
       .update(documentTriggers)
       .set({
@@ -60,5 +59,5 @@ export async function updateDocumentTriggerConfiguration(
     }
 
     return Result.ok(result[0]! as DocumentTrigger)
-  }, db)
+  })
 }

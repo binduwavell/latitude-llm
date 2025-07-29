@@ -48,7 +48,8 @@
                 "group": "Onboarding Paths",
                 "pages": [
                   "guides/getting-started/quick-start-pm",
-                  "guides/getting-started/quick-start-dev"
+                  "guides/getting-started/quick-start-dev",
+                  "guides/contribution/contributors"
                 ]
               },
               {
@@ -81,6 +82,7 @@
             "group": "Agents",
             "pages": [
               "guides/prompt-manager/agents",
+              "guides/prompt-manager/subagents",
               {
                 "group": "Integrations",
                 "pages": [

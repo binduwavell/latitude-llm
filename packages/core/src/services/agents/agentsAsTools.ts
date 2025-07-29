@@ -1,7 +1,11 @@
-import { AgentToolsMap, LogSources } from '@latitude-data/constants'
+import {
+  AgentToolsMap,
+  ChainEvent,
+  StreamEventTypes,
+} from '@latitude-data/constants'
 import { ChainError, RunErrorCodes } from '@latitude-data/constants/errors'
 import { Tool } from 'ai'
-import { JSONSchema7 } from 'json-schema'
+import { JSONSchema7, JSONSchema7TypeName } from 'json-schema'
 import { scan } from 'promptl-ai'
 import { Commit, DocumentVersion, Workspace } from '../../browser'
 import { database } from '../../client'
@@ -11,6 +15,19 @@ import { DocumentVersionsRepository } from '../../repositories'
 import { telemetry, TelemetryContext } from '../../telemetry'
 import { runDocumentAtCommit } from '../commits'
 import { getAgentToolName } from './helpers'
+import { StreamManager } from '../../lib/streamManager'
+
+const JSON_SCHEMA_TYPES = {
+  string: 'string',
+  number: 'number',
+  boolean: 'boolean',
+  object: 'object',
+  integer: 'integer',
+  array: 'array',
+  null: 'null',
+} as const satisfies {
+  [T in JSONSchema7TypeName]: T
+}
 
 const DEFAULT_PARAM_DEFINITION: JSONSchema7 = {
   type: 'string',
@@ -21,6 +38,7 @@ export async function getToolDefinitionFromDocument({
   commit,
   document,
   referenceFn,
+  streamManager,
   context,
 }: {
   workspace: Workspace
@@ -30,6 +48,7 @@ export async function getToolDefinitionFromDocument({
     target: string,
     from?: string,
   ) => Promise<{ path: string; content: string } | undefined>
+  streamManager: StreamManager
   context: TelemetryContext
 }): Promise<Tool> {
   const metadata = await scan({
@@ -39,10 +58,20 @@ export async function getToolDefinitionFromDocument({
   })
 
   const description = metadata.config['description'] as string | undefined
-  const params = (metadata.config['parameters'] ?? {}) as Record<
-    string,
-    JSONSchema7
-  >
+  const params = Object.fromEntries(
+    Object.entries(
+      (metadata.config['parameters'] ?? {}) as Record<string, JSONSchema7>,
+    ).map(([key, schema]) => [
+      key,
+      {
+        ...schema,
+        type:
+          schema.type && !Array.isArray(schema.type)
+            ? (JSON_SCHEMA_TYPES[schema.type] ?? 'string')
+            : schema.type,
+      },
+    ]),
+  ) as Record<string, JSONSchema7>
   metadata.parameters.forEach((param) => {
     if (param in params) return
     params[param] = DEFAULT_PARAM_DEFINITION
@@ -57,7 +86,7 @@ export async function getToolDefinitionFromDocument({
       additionalProperties: false,
     },
     execute: async (args: Record<string, unknown>, toolCall) => {
-      const $span = telemetry.tool(context, {
+      const $tool = telemetry.tool(context, {
         name: getAgentToolName(document.path),
         call: {
           id: toolCall.toolCallId,
@@ -66,14 +95,26 @@ export async function getToolDefinitionFromDocument({
       })
 
       try {
-        const { response, error } = await runDocumentAtCommit({
-          context,
+        const { response, stream, error } = await runDocumentAtCommit({
+          context: $tool.context,
           workspace,
           document,
           commit,
           parameters: args,
-          source: LogSources.AgentAsTool,
+          tools: streamManager.tools,
+          // TODO: Review this. We are forwarding the parent's source so that
+          // tool calls are automatically handled in playground and evaluation
+          // contexts. This is not ideal. Spoiler: a boolean prop to control
+          // this is also not ideal.
+          //
+          // On the other hand, it's actually useful to konw the context from
+          // which a subagent was called, rather than just "agentAsTool".
+          //
+          // So... I'm not sure what to do here yet.
+          source: streamManager.source,
         }).then((r) => r.unwrap())
+
+        forwardToolEvents({ source: stream, target: streamManager.controller })
 
         const res = await response
         if (!res) {
@@ -92,7 +133,7 @@ export async function getToolDefinitionFromDocument({
 
         const value = res.streamType === 'text' ? res.text : res.object
 
-        $span?.end({ result: { value, isError: false } })
+        $tool?.end({ result: { value, isError: false } })
 
         return {
           value,
@@ -104,7 +145,7 @@ export async function getToolDefinitionFromDocument({
           isError: true,
         }
 
-        $span?.end({ result })
+        $tool?.end({ result })
 
         return result
       }
@@ -134,4 +175,27 @@ export async function buildAgentsToolsMap(
   }, {})
 
   return Result.ok(agentToolsMap)
+}
+
+async function forwardToolEvents({
+  source,
+  target,
+}: {
+  source?: ReadableStream<ChainEvent>
+  target?: ReadableStreamDefaultController<ChainEvent>
+}) {
+  if (!source || !target) return
+
+  const reader = source.getReader()
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    const { event, data } = value
+    if (event === StreamEventTypes.Provider) {
+      if (data.type === 'tool-call' || data.type === 'tool-result') {
+        target.enqueue(value)
+      }
+    }
+  }
 }

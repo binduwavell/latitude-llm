@@ -10,7 +10,7 @@ import { getCurrentUser } from '$/services/auth/getCurrentUser'
 import { LIMITED_VIEW_THRESHOLD } from '@latitude-data/core/browser'
 import { Text } from '@latitude-data/web-ui/atoms/Text'
 import { TableWithHeader } from '@latitude-data/web-ui/molecules/ListingHeader'
-import DocumentsLayout from '../_components/DocumentsLayout'
+import ProjectLayout from '../_components/ProjectLayout'
 import { DocumentBlankSlateLayout } from '../documents/_components/DocumentBlankSlateLayout'
 import Overview from './_components/Overview'
 import { AddFileButton } from './_components/Overview/AddFileButton'
@@ -36,7 +36,7 @@ export default async function OverviewPage({
   const hasLogs = await hasDocumentLogsByProjectCached(projectId)
   if (!hasLogs) {
     return (
-      <DocumentsLayout projectId={projectId} commitUuid={commitUuid}>
+      <ProjectLayout projectId={projectId} commitUuid={commitUuid}>
         <DocumentBlankSlateLayout
           title={project.name}
           description='To get started, please choose one of the following options.'
@@ -45,7 +45,7 @@ export default async function OverviewPage({
           <Text.H5 color='foregroundMuted'>Or</Text.H5>
           <AddPromptTextarea />
         </DocumentBlankSlateLayout>
-      </DocumentsLayout>
+      </ProjectLayout>
     )
   }
 
@@ -70,13 +70,13 @@ export default async function OverviewPage({
   }
 
   return (
-    <DocumentsLayout projectId={projectId} commitUuid={commitUuid}>
+    <ProjectLayout projectId={projectId} commitUuid={commitUuid}>
       <div className='min-h-full w-full p-6'>
         <TableWithHeader
           title='Overview'
           table={<Overview project={project} limitedView={limitedView} />}
         />
       </div>
-    </DocumentsLayout>
+    </ProjectLayout>
   )
 }

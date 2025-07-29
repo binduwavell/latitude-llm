@@ -24,22 +24,24 @@ export const ingestSpansJob = async (job: Job<IngestSpansJobData>) => {
   try {
     const payload = await disk.get(key)
     data = JSON.parse(payload) as SpanIngestionData
-  } catch { return } // prettier-ignore
+  } catch (error) {
+    captureException(error as Error)
+    return
+  }
   const { spans } = data
 
   const result = await ingestSpans({ spans, apiKeyId, workspaceId })
   if (result.error) {
     // @ts-expect-error ingestSpans currently ignores all errors but leaving this for the future
-    if (!(result.error instanceof UnprocessableEntityError)) {
-      throw result.error
-    }
-
-    if (process.env.NODE_ENV === 'development') {
+    if (result.error instanceof UnprocessableEntityError) {
       captureException(result.error)
-    }
+    } else throw result.error
   }
 
   try {
     await disk.delete(key)
-  } catch { return } // prettier-ignore
+  } catch (error) {
+    captureException(error as Error)
+    return
+  }
 }

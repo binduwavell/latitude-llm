@@ -10,7 +10,6 @@ import {
   MAX_DOCUMENT_SUGGESTIONS_PER_EVALUATION,
   Workspace,
 } from '../../browser'
-import { database } from '../../client'
 import { publisher } from '../../events/publisher'
 import { UnprocessableEntityError } from '../../lib/errors'
 import { Result } from '../../lib/Result'
@@ -26,6 +25,7 @@ import {
   serializeEvaluationResult as serializeEvaluationResultV2,
   serializeEvaluation as serializeEvaluationV2,
 } from './serialize'
+import { database } from '../../client'
 
 async function checkSuggestionLimits(
   {
@@ -79,7 +79,7 @@ export async function generateDocumentSuggestion(
     commit: Commit
     workspace: Workspace
   },
-  db = database,
+  transaction = new Transaction(),
 ) {
   if (!env.LATITUDE_CLOUD) {
     return Result.error(new Error(CLOUD_MESSAGES.documentSuggestions))
@@ -89,10 +89,9 @@ export async function generateDocumentSuggestion(
     return Result.error(new Error('COPILOT_REFINE_PROMPT_PATH is not set'))
   }
 
-  const copilot = await getCopilot(
-    { path: env.COPILOT_REFINE_PROMPT_PATH },
-    db,
-  ).then((r) => r.unwrap())
+  const copilot = await getCopilot({
+    path: env.COPILOT_REFINE_PROMPT_PATH,
+  }).then((r) => r.unwrap())
 
   if (!evaluation.enableSuggestions) {
     return Result.error(
@@ -102,17 +101,15 @@ export async function generateDocumentSuggestion(
     )
   }
 
-  const limits = await checkSuggestionLimits(
-    { document, evaluation, commit, workspace },
-    db,
-  )
-  if (limits.error) return limits
-
+  const limitsResult = await checkSuggestionLimits({
+    document,
+    evaluation,
+    commit,
+    workspace,
+  })
+  if (limitsResult.error) return limitsResult
   if (!results) {
-    const resultsRepository = new EvaluationResultsV2Repository(
-      workspace.id,
-      db,
-    )
+    const resultsRepository = new EvaluationResultsV2Repository(workspace.id)
     results = await resultsRepository
       .selectForDocumentSuggestion({
         commitId: commit.id,
@@ -137,14 +134,14 @@ export async function generateDocumentSuggestion(
     }
   }
 
-  const serializedEvaluation = await serializeEvaluationV2({ evaluation }).then(
-    (r) => r.unwrap(),
-  )
+  const serializedEvaluation = await serializeEvaluationV2({
+    evaluation,
+  }).then((r) => r.unwrap())
 
   const serializedResults = await Promise.all(
     results.map((result) =>
-      serializeEvaluationResultV2({ evaluation, result, workspace }, db).then(
-        (r) => r.unwrap(),
+      serializeEvaluationResultV2({ evaluation, result, workspace }).then((r) =>
+        r.unwrap(),
       ),
     ),
   )
@@ -159,7 +156,7 @@ export async function generateDocumentSuggestion(
     schema: refinerSchema,
   }).then((r) => r.unwrap())
 
-  return Transaction.call(async (tx) => {
+  return transaction.call(async (tx) => {
     const documentsRepository = new DocumentVersionsRepository(workspace.id, tx)
     const lock = await documentsRepository.lock({
       commitId: document.commitId,
@@ -167,10 +164,12 @@ export async function generateDocumentSuggestion(
     })
     if (lock.error) return lock
 
-    const limits = await checkSuggestionLimits(
-      { document, evaluation, commit, workspace },
-      tx,
-    )
+    const limits = await checkSuggestionLimits({
+      document,
+      evaluation,
+      commit,
+      workspace,
+    })
     if (limits.error) return limits
 
     const suggestion = await tx
@@ -212,5 +211,5 @@ export async function generateDocumentSuggestion(
     })
 
     return Result.ok({ suggestion })
-  }, db)
+  })
 }

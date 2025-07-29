@@ -1,18 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { IntegrationType } from '@latitude-data/constants'
+import { DocumentTriggerType, IntegrationType } from '@latitude-data/constants'
 import {
   Workspace,
-  IntegrationDto,
   PipedreamIntegration,
+  DocumentTrigger,
 } from '../../../browser'
 import { updatePipedreamTrigger } from './triggers'
 import { Result } from '../../../lib/Result'
-import { IntegrationTriggerConfiguration } from '../../documentTriggers/helpers/schema'
+import { IntegrationTriggerConfiguration } from '@latitude-data/constants/documentTriggers'
 import * as appsModule from './apps'
 import * as componentsModule from './components'
 import * as triggersModule from './triggers'
-import { BadRequestError } from '@latitude-data/constants/errors'
+import { BadRequestError, NotFoundError } from '@latitude-data/constants/errors'
 import * as factories from '../../../tests/factories'
+import { PipedreamIntegrationConfiguration } from '../helpers/schema'
 
 const mockPipedreamClient = {
   updateTrigger: vi.fn(),
@@ -26,16 +27,21 @@ vi.mock('@pipedream/sdk', () => ({
 
 describe('updatePipedreamTrigger', () => {
   let workspace: Workspace
-  let integration1: IntegrationDto
-  let integration2: IntegrationDto
+  let integration1: PipedreamIntegration & {
+    configuration: PipedreamIntegrationConfiguration
+  }
+  let integration2: PipedreamIntegration & {
+    configuration: PipedreamIntegrationConfiguration
+  }
   let originalConfig: IntegrationTriggerConfiguration
   let updatedConfig: IntegrationTriggerConfiguration
+  let originalTrigger: DocumentTrigger
 
   beforeEach(async () => {
     const { workspace: createdWorkspace } = await factories.createProject()
     workspace = createdWorkspace
 
-    integration1 = await factories.createIntegration({
+    integration1 = (await factories.createIntegration({
       workspace,
       type: IntegrationType.Pipedream,
       configuration: {
@@ -45,9 +51,11 @@ describe('updatePipedreamTrigger', () => {
         authType: 'oauth',
         oauthAppId: 'oauth-app-1',
       },
-    })
+    })) as PipedreamIntegration & {
+      configuration: PipedreamIntegrationConfiguration
+    }
 
-    integration2 = await factories.createIntegration({
+    integration2 = (await factories.createIntegration({
       workspace,
       type: IntegrationType.Pipedream,
       configuration: {
@@ -57,7 +65,9 @@ describe('updatePipedreamTrigger', () => {
         authType: 'oauth',
         oauthAppId: 'oauth-app-2',
       },
-    })
+    })) as PipedreamIntegration & {
+      configuration: PipedreamIntegrationConfiguration
+    }
 
     originalConfig = {
       integrationId: integration1.id,
@@ -65,6 +75,18 @@ describe('updatePipedreamTrigger', () => {
       properties: { prop1: 'value1' },
       payloadParameters: ['param1'],
       triggerId: 'trigger-1',
+    }
+
+    originalTrigger = {
+      id: 123,
+      uuid: '000-0000-0000-0000',
+      documentUuid: '111-1111-1111-1111',
+      projectId: 1,
+      workspaceId: workspace.id,
+      triggerType: DocumentTriggerType.Integration,
+      configuration: originalConfig as IntegrationTriggerConfiguration,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }
 
     updatedConfig = {
@@ -103,7 +125,10 @@ describe('updatePipedreamTrigger', () => {
 
       const result = await updatePipedreamTrigger({
         workspace,
-        originalConfig,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
         updatedConfig: identicalConfig,
       })
 
@@ -121,7 +146,10 @@ describe('updatePipedreamTrigger', () => {
     it('updates the trigger properties successfully', async () => {
       const result = await updatePipedreamTrigger({
         workspace,
-        originalConfig,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
         updatedConfig,
       })
 
@@ -135,8 +163,7 @@ describe('updatePipedreamTrigger', () => {
       })
       expect(mockPipedreamClient.updateTrigger).toHaveBeenCalledWith({
         id: originalConfig.triggerId,
-        externalUserId: (integration1 as PipedreamIntegration).configuration
-          .externalUserId,
+        externalUserId: integration1.configuration.externalUserId,
         configuredProps: { prop1: 'filledValue1' },
       })
     })
@@ -150,7 +177,10 @@ describe('updatePipedreamTrigger', () => {
 
       const result = await updatePipedreamTrigger({
         workspace,
-        originalConfig,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
         updatedConfig: configWithInvalidIntegration,
       })
 
@@ -175,7 +205,10 @@ describe('updatePipedreamTrigger', () => {
 
       const result = await updatePipedreamTrigger({
         workspace,
-        originalConfig,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
         updatedConfig: configWithNonPipedreamIntegration,
       })
 
@@ -196,7 +229,10 @@ describe('updatePipedreamTrigger', () => {
 
       const result = await updatePipedreamTrigger({
         workspace,
-        originalConfig,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
         updatedConfig,
       })
 
@@ -212,7 +248,10 @@ describe('updatePipedreamTrigger', () => {
 
       const result = await updatePipedreamTrigger({
         workspace,
-        originalConfig,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
         updatedConfig,
       })
 
@@ -226,12 +265,138 @@ describe('updatePipedreamTrigger', () => {
 
       const result = await updatePipedreamTrigger({
         workspace,
-        originalConfig,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
         updatedConfig,
       })
 
       expect(Result.isOk(result)).toBe(false)
       expect(result.error).toBe(updateError)
+    })
+  })
+
+  describe('when integration is not configured', () => {
+    let unconfiguredIntegration: PipedreamIntegration
+
+    beforeEach(async () => {
+      unconfiguredIntegration = (await factories.createIntegration({
+        workspace,
+        type: IntegrationType.Pipedream,
+        configuration: {
+          appName: 'unconfigured-test-app',
+          metadata: {
+            displayName: 'Unconfigured Test App',
+            imageUrl: 'https://example.com/image.png',
+          },
+        },
+      })) as PipedreamIntegration
+    })
+
+    it('returns error when trying to update to an unconfigured integration', async () => {
+      const configWithUnconfiguredIntegration = {
+        ...originalConfig,
+        integrationId: unconfiguredIntegration.id,
+        properties: { prop1: 'updatedValue1' }, // different to trigger update path
+      }
+
+      const result = await updatePipedreamTrigger({
+        workspace,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
+        updatedConfig: configWithUnconfiguredIntegration,
+      })
+
+      expect(Result.isOk(result)).toBe(false)
+      expect(result.error).toBeInstanceOf(NotFoundError)
+      if (result.error) {
+        expect(result.error.message).toContain(
+          `Integration '${unconfiguredIntegration.name}' has not been configured`,
+        )
+      }
+
+      expect(mockPipedreamClient.updateTrigger).not.toHaveBeenCalled()
+      expect(mockPipedreamClient.deleteTrigger).not.toHaveBeenCalled()
+      expect(mockPipedreamClient.deployTrigger).not.toHaveBeenCalled()
+    })
+
+    it('returns error when trying to update properties of an unconfigured integration', async () => {
+      const originalConfigUnconfigured = {
+        ...originalConfig,
+        integrationId: unconfiguredIntegration.id,
+      }
+
+      const updatedConfigUnconfigured = {
+        ...originalConfigUnconfigured,
+        properties: { prop1: 'updatedValue1', newProp: 'newValue' }, // different properties
+        payloadParameters: ['param1', 'param2'],
+      }
+
+      const result = await updatePipedreamTrigger({
+        workspace,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
+        updatedConfig: updatedConfigUnconfigured,
+      })
+
+      expect(Result.isOk(result)).toBe(false)
+      expect(result.error).toBeInstanceOf(NotFoundError)
+      if (result.error) {
+        expect(result.error.message).toContain(
+          `Integration '${unconfiguredIntegration.name}' has not been configured`,
+        )
+      }
+
+      expect(mockPipedreamClient.updateTrigger).not.toHaveBeenCalled()
+      expect(mockPipedreamClient.deleteTrigger).not.toHaveBeenCalled()
+      expect(mockPipedreamClient.deployTrigger).not.toHaveBeenCalled()
+    })
+
+    it('returns error when trying to change to a different unconfigured integration', async () => {
+      const anotherUnconfiguredIntegration = (await factories.createIntegration(
+        {
+          workspace,
+          type: IntegrationType.Pipedream,
+          configuration: {
+            appName: 'another-unconfigured-app',
+            metadata: {
+              displayName: 'Another Unconfigured App',
+            },
+          },
+        },
+      )) as PipedreamIntegration
+
+      const configWithDifferentUnconfiguredIntegration = {
+        ...originalConfig,
+        integrationId: anotherUnconfiguredIntegration.id,
+        componentId: 'different-component',
+      }
+
+      const result = await updatePipedreamTrigger({
+        workspace,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
+        updatedConfig: configWithDifferentUnconfiguredIntegration,
+      })
+
+      expect(Result.isOk(result)).toBe(false)
+      expect(result.error).toBeInstanceOf(NotFoundError)
+      if (result.error) {
+        expect(result.error.message).toContain(
+          `Integration '${anotherUnconfiguredIntegration.name}' has not been configured`,
+        )
+      }
+
+      expect(mockPipedreamClient.updateTrigger).not.toHaveBeenCalled()
+      expect(mockPipedreamClient.deleteTrigger).not.toHaveBeenCalled()
+      expect(mockPipedreamClient.deployTrigger).not.toHaveBeenCalled()
     })
   })
 
@@ -254,7 +419,10 @@ describe('updatePipedreamTrigger', () => {
     it('deletes old trigger and deploys new one successfully', async () => {
       const result = await updatePipedreamTrigger({
         workspace,
-        originalConfig,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
         updatedConfig: updatedConfigDifferentTrigger,
       })
 
@@ -266,13 +434,11 @@ describe('updatePipedreamTrigger', () => {
 
       expect(mockPipedreamClient.deleteTrigger).toHaveBeenCalledWith({
         id: originalConfig.triggerId,
-        externalUserId: (integration1 as PipedreamIntegration).configuration
-          .externalUserId,
+        externalUserId: integration1.configuration.externalUserId,
       })
 
       expect(mockPipedreamClient.deployTrigger).toHaveBeenCalledWith({
-        externalUserId: (integration2 as PipedreamIntegration).configuration
-          .externalUserId,
+        externalUserId: integration2.configuration.externalUserId,
         triggerId: { key: updatedConfigDifferentTrigger.componentId },
         configuredProps: { prop1: 'filledValue1' },
         webhookUrl: expect.stringContaining('/webhook/integration/'),
@@ -285,7 +451,10 @@ describe('updatePipedreamTrigger', () => {
 
       const result = await updatePipedreamTrigger({
         workspace,
-        originalConfig,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
         updatedConfig: updatedConfigDifferentTrigger,
       })
 
@@ -299,7 +468,10 @@ describe('updatePipedreamTrigger', () => {
 
       const result = await updatePipedreamTrigger({
         workspace,
-        originalConfig,
+        trigger: originalTrigger as Extract<
+          DocumentTrigger,
+          { configuration: IntegrationTriggerConfiguration }
+        >,
         updatedConfig: updatedConfigDifferentTrigger,
       })
 
