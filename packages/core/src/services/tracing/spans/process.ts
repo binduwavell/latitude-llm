@@ -53,7 +53,10 @@ import {
 import { cache as redis } from '../../../cache'
 import { database } from '../../../client'
 import { publisher } from '../../../events/publisher'
-import { processSegmentJobKey } from '../../../jobs/job-definitions/tracing/processSegmentJob'
+import {
+  ProcessSegmentJobData,
+  processSegmentJobKey,
+} from '../../../jobs/job-definitions/tracing/processSegmentJob'
 import { tracingQueue } from '../../../jobs/queues'
 import { diskFactory, DiskWrapper } from '../../../lib/disk'
 import { UnprocessableEntityError } from '../../../lib/errors'
@@ -76,10 +79,10 @@ export async function processSpan(
     apiKey: ApiKey
     workspace: Workspace
   },
-  db = database,
+  transaction = new Transaction(),
   disk: DiskWrapper = diskFactory('private'),
 ) {
-  const getting = await getExisting({ span, workspace }, db)
+  const getting = await getExisting({ span, workspace })
   if (getting.error) return Result.error(getting.error)
   const existing = getting.value
 
@@ -147,7 +150,7 @@ export async function processSpan(
   if (extractingse.error) return Result.error(extractingse.error)
   if (extractingse.value != undefined) {
     status = SpanStatus.Error
-    message = extractingse.value || undefined
+    message = extractingse.value?.slice(0, 256) || undefined
   }
 
   let metadata = {
@@ -161,69 +164,78 @@ export async function processSpan(
     } satisfies BaseSpanMetadata),
   } as SpanMetadata
 
-  const processing = await specification.process(
-    { attributes, status, scope, apiKey, workspace },
-    db,
-  )
+  const processing = await specification.process({
+    attributes,
+    status,
+    scope,
+    apiKey,
+    workspace,
+  })
   if (processing.error) return Result.error(processing.error)
   metadata = { ...metadata, ...processing.value }
 
-  return await Transaction.call(async (tx) => {
-    const saving = await saveMetadata({ metadata, workspace }, disk)
-    if (saving.error) return Result.error(saving.error)
+  const saving = await saveMetadata({ metadata, workspace }, disk)
+  if (saving.error) return Result.error(saving.error)
 
-    const span = (await tx
-      .insert(spans)
-      .values({
-        id: id,
-        traceId: traceId,
-        segmentId: segmentId,
-        parentId: parentId,
-        workspaceId: workspace.id,
-        apiKeyId: apiKey.id,
-        name: name,
-        kind: kind,
-        type: type,
-        status: status,
-        message: message,
-        duration: duration,
-        startedAt: startedAt,
-        endedAt: endedAt,
-      })
-      .returning()
-      .then((r) => r[0]!)) as Span
+  return await transaction.call(
+    async (tx) => {
+      const newSpan = (await tx
+        .insert(spans)
+        .values({
+          id: id,
+          traceId: traceId,
+          segmentId: segmentId,
+          parentId: parentId,
+          workspaceId: workspace.id,
+          apiKeyId: apiKey.id,
+          name: name,
+          kind: kind,
+          type: type,
+          status: status,
+          message: message,
+          duration: duration,
+          startedAt: startedAt,
+          endedAt: endedAt,
+        })
+        .returning()
+        .then((r) => r[0]!)) as Span
 
-    await publisher.publishLater({
-      type: 'spanCreated',
-      data: {
-        span: span,
-        apiKeyId: apiKey.id,
-        workspaceId: workspace.id,
-      },
-    })
-
-    const segment = segments.pop()
-    if (segment) {
-      const payload = {
-        segment: segment,
-        chain: segments,
-        childId: span.id,
-        childType: 'span' as const,
-        traceId: traceId,
-        apiKeyId: apiKey.id,
-        workspaceId: workspace.id,
-      }
-
-      await tracingQueue.add('processSegmentJob', payload, {
-        attempts: TRACING_JOBS_MAX_ATTEMPTS,
-        deduplication: {
-          id: processSegmentJobKey(payload, { ...span, metadata }),
+      return Result.ok({ span: { ...newSpan, metadata } })
+    },
+    async ({ span }) => {
+      publisher.publishLater({
+        type: 'spanCreated',
+        data: {
+          spanId: span.id,
+          apiKeyId: apiKey.id,
+          workspaceId: workspace.id,
         },
       })
-    }
 
-    return Result.ok({ span: { ...span, metadata } })
-  }, db)
+      let payload: ProcessSegmentJobData | undefined
+      const segment = segments.pop()
+      if (segment) {
+        payload = {
+          segment: segment,
+          chain: segments,
+          childId: span.id,
+          childType: 'span' as const,
+          traceId: traceId,
+          apiKeyId: apiKey.id,
+          workspaceId: workspace.id,
+        }
+      }
+
+      if (payload) {
+        await tracingQueue.add('processSegmentJob', payload, {
+          attempts: TRACING_JOBS_MAX_ATTEMPTS,
+          deduplication: {
+            id: processSegmentJobKey(payload, span),
+          },
+        })
+      }
+    },
+  )
 }
 
 async function getExisting(

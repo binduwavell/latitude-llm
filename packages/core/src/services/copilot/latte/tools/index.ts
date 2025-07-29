@@ -1,5 +1,5 @@
 import { LatteTool } from '@latitude-data/constants/latte'
-import { Workspace } from '../../../../browser'
+import { User, Workspace } from '../../../../browser'
 import { Result, TypedResult } from '../../../../lib/Result'
 import type { LatteToolFn } from './types'
 
@@ -11,8 +11,14 @@ import listProjects from './projects/list'
 import listIntegrations from './settings/listIntegrations'
 import listIntegrationTools from './settings/listIntegrationTools'
 import listProviders from './settings/listProviders'
+import listIntegrationTriggers from './settings/listIntegrationTriggers'
 import think from './general/think'
+import searchIntegrationResources from './settings/searchIntegrationResources'
+import searchIntegrationApps from './settings/searchIntegrationApps'
+import createIntegration from './settings/createIntegration'
 import { ToolHandler } from '../../../../lib/streamManager/clientTools/handlers'
+import triggerActions from './triggers/triggerActions'
+import listExistingTriggers from './triggers/listExistingTriggers'
 
 export const LATTE_TOOLS: Record<LatteTool, LatteToolFn<any>> = {
   [LatteTool.think]: think,
@@ -24,14 +30,22 @@ export const LATTE_TOOLS: Record<LatteTool, LatteToolFn<any>> = {
   [LatteTool.listProviders]: listProviders,
   [LatteTool.listIntegrations]: listIntegrations,
   [LatteTool.listIntegrationTools]: listIntegrationTools,
+  [LatteTool.searchIntegrationResources]: searchIntegrationResources,
+  [LatteTool.searchIntegrationApps]: searchIntegrationApps,
+  [LatteTool.createIntegration]: createIntegration,
+  [LatteTool.listIntegrationTriggers]: listIntegrationTriggers,
+  [LatteTool.triggerActions]: triggerActions,
+  [LatteTool.listExistingTriggers]: listExistingTriggers,
 } as const
 
 export function buildToolHandlers({
   workspace,
   threadUuid,
+  user,
 }: {
   workspace: Workspace
   threadUuid: string
+  user: User
 }): Record<LatteTool, ToolHandler> {
   const latteToolEntries = Object.entries(LATTE_TOOLS) as [
     LatteTool,
@@ -48,6 +62,7 @@ export function buildToolHandlers({
             workspace,
             toolName,
             toolCall,
+            user,
           })
         } catch (error) {
           result = Result.error(error as Error)

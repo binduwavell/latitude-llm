@@ -4,7 +4,6 @@ import {
   IntegrationType,
 } from '@latitude-data/constants'
 import { DocumentTrigger, Project, Workspace } from '../../browser'
-import { database } from '../../client'
 import { BadRequestError, LatitudeError } from '../../lib/errors'
 import { generateUUIDIdentifier } from '../../lib/generateUUID'
 import { Result } from '../../lib/Result'
@@ -17,7 +16,8 @@ import {
   DocumentTriggerConfiguration,
   InsertDocumentTriggerWithConfiguration,
   IntegrationTriggerConfiguration,
-} from './helpers/schema'
+} from '@latitude-data/constants/documentTriggers'
+import { database } from '../../client'
 
 async function completeIntegrationTriggerConfig(
   {
@@ -36,9 +36,8 @@ async function completeIntegrationTriggerConfig(
     configuration.integrationId,
   )
 
-  if (!Result.isOk(integrationResult)) {
-    return Result.error(integrationResult.error)
-  }
+  if (!Result.isOk(integrationResult)) return integrationResult
+
   const integration = integrationResult.unwrap()
 
   if (integration.type !== IntegrationType.Pipedream) {
@@ -77,20 +76,19 @@ export async function createDocumentTrigger(
     document: DocumentVersion
     project: Project
   } & InsertDocumentTriggerWithConfiguration,
-  db = database,
+  transaction = new Transaction(),
 ): PromisedResult<DocumentTrigger> {
-  return await Transaction.call(async (tx) => {
+  return await transaction.call(async (tx) => {
     const triggerUuid = generateUUIDIdentifier()
+    const documentTriggerConfiguration = await getFullConfiguration({
+      workspace,
+      triggerUuid,
+      triggerType,
+      configuration,
+    })
 
-    if (triggerType === DocumentTriggerType.Integration) {
-      configuration = await completeIntegrationTriggerConfig(
-        {
-          workspace,
-          triggerUuid,
-          configuration: configuration as IntegrationTriggerConfiguration,
-        },
-        tx,
-      ).then((r) => r.unwrap())
+    if (!Result.isOk(documentTriggerConfiguration)) {
+      return documentTriggerConfiguration
     }
 
     const result = await tx
@@ -101,10 +99,7 @@ export async function createDocumentTrigger(
         documentUuid: document.documentUuid,
         projectId: project.id,
         triggerType,
-        configuration: buildConfiguration({
-          triggerType,
-          configuration: configuration as DocumentTriggerConfiguration,
-        }),
+        configuration: documentTriggerConfiguration.unwrap(),
       })
       .returning()
 
@@ -115,5 +110,26 @@ export async function createDocumentTrigger(
     }
 
     return Result.ok(result[0]! as DocumentTrigger)
-  }, db)
+  })
+}
+
+export async function getFullConfiguration({
+  workspace,
+  triggerUuid,
+  triggerType,
+  configuration,
+}: {
+  workspace: Workspace
+  triggerUuid: string
+  triggerType: DocumentTriggerType
+  configuration: InsertDocumentTriggerWithConfiguration['configuration']
+}): PromisedResult<DocumentTriggerConfiguration> {
+  if (triggerType === DocumentTriggerType.Integration) {
+    return completeIntegrationTriggerConfig({
+      workspace: workspace,
+      triggerUuid: triggerUuid,
+      configuration: configuration as IntegrationTriggerConfiguration,
+    })
+  }
+  return Result.ok(buildConfiguration({ triggerType, configuration }))
 }

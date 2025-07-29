@@ -21,8 +21,6 @@ import type {
   ProviderLog,
   ProviderLogDto,
   Providers,
-  Segment,
-  Span,
   User,
   Workspace,
 } from '../browser'
@@ -489,7 +487,7 @@ export type SpanCreatedEvent = LatitudeEventGeneric<
   {
     workspaceId: number
     apiKeyId: number
-    span: Span
+    spanId: string
   }
 >
 
@@ -498,7 +496,7 @@ export type SegmentCreatedEvent = LatitudeEventGeneric<
   {
     workspaceId: number
     apiKeyId: number
-    segment: Segment
+    segmentId: string
   }
 >
 
@@ -507,7 +505,7 @@ export type SegmentUpdatedEvent = LatitudeEventGeneric<
   {
     workspaceId: number
     apiKeyId: number
-    segment: Segment
+    segmentId: string
   }
 >
 

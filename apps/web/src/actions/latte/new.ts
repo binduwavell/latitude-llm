@@ -2,10 +2,8 @@
 
 import { z } from 'zod'
 import { authProcedure } from '$/actions/procedures'
-import {
-  createLatteJob,
-  createLatteThread,
-} from '@latitude-data/core/services/copilot/index'
+import { createLatteJob } from '@latitude-data/core/services/copilot/latte/createLatteJob'
+import { createLatteThread } from '@latitude-data/core/services/copilot/latte/threads/createThread'
 
 export const createNewLatteAction = authProcedure
   .createServerAction()
@@ -27,6 +25,7 @@ export const createNewLatteAction = authProcedure
     const runResult = await createLatteJob({
       threadUuid: thread.uuid,
       workspace,
+      user,
       message,
       context,
     })

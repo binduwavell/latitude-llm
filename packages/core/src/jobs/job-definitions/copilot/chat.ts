@@ -2,16 +2,15 @@ import { Job } from 'bullmq'
 
 import { unsafelyFindWorkspace } from '../../../data-access'
 import { LatitudeError } from '../../../lib/errors'
-import { DocumentLogsRepository } from '../../../repositories'
-import {
-  addMessageToExistingLatte,
-  runNewLatte,
-} from '../../../services/copilot/latte'
+import { DocumentLogsRepository, UsersRepository } from '../../../repositories'
+import { addMessageToExistingLatte } from '../../../services/copilot/latte/addMessage'
+import { runNewLatte } from '../../../services/copilot/latte/run'
 import { getCopilotDocument } from '../../../services/copilot/latte/helpers'
 import { WebsocketClient } from '../../../websockets/workers'
 
 export type RunLatteJobData = {
   workspaceId: number
+  userId: string
   threadUuid: string
   message: string
   context: string
@@ -36,8 +35,20 @@ async function emitError({
 }
 
 export const runLatteJob = async (job: Job<RunLatteJobData>) => {
-  const { workspaceId, threadUuid, message, context } = job.data
+  const { workspaceId, userId, threadUuid, message, context } = job.data
   const workspace = await unsafelyFindWorkspace(workspaceId).then((w) => w!)
+
+  const usersScope = new UsersRepository(workspace.id)
+  const userResult = await usersScope.find(userId)
+  if (!userResult.ok) {
+    await emitError({
+      workspaceId,
+      threadUuid,
+      error: userResult.error as LatitudeError,
+    })
+    return userResult
+  }
+  const user = userResult.unwrap()
 
   const copilotResult = await getCopilotDocument()
   if (!copilotResult.ok) {
@@ -65,6 +76,7 @@ export const runLatteJob = async (job: Job<RunLatteJobData>) => {
       copilotCommit,
       copilotDocument,
       clientWorkspace: workspace,
+      user,
       threadUuid,
       message,
       context,
@@ -86,6 +98,7 @@ export const runLatteJob = async (job: Job<RunLatteJobData>) => {
     copilotCommit,
     copilotDocument,
     clientWorkspace: workspace,
+    user,
     threadUuid,
     message,
     context,

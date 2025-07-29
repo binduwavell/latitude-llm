@@ -24,11 +24,17 @@ export const processSpanJob = async (job: Job<ProcessSpanJobData>) => {
   const { processingId, apiKeyId, workspaceId } = job.data
 
   const workspace = await unsafelyFindWorkspace(workspaceId)
-  if (!workspace) return
+  if (!workspace) {
+    captureException(new UnprocessableEntityError('Workspace not found'))
+    return
+  }
 
   const repository = new ApiKeysRepository(workspace.id)
   const finding = await repository.find(apiKeyId)
-  if (finding.error) return
+  if (finding.error) {
+    captureException(finding.error)
+    return
+  }
   const apiKey = finding.value
 
   const disk = diskFactory('private')
@@ -37,21 +43,23 @@ export const processSpanJob = async (job: Job<ProcessSpanJobData>) => {
   try {
     const payload = await disk.get(key)
     data = JSON.parse(payload) as SpanProcessingData
-  } catch { return } // prettier-ignore
+  } catch (error) {
+    captureException(error as Error)
+    return
+  }
   const { span, scope } = data
 
   const result = await processSpan({ span, scope, apiKey, workspace })
   if (result.error) {
-    if (!(result.error instanceof UnprocessableEntityError)) {
-      throw result.error
-    }
-
-    if (process.env.NODE_ENV === 'development') {
+    if (result.error instanceof UnprocessableEntityError) {
       captureException(result.error)
-    }
+    } else throw result.error
   }
 
   try {
     await disk.delete(key)
-  } catch { return } // prettier-ignore
+  } catch (error) {
+    captureException(error as Error)
+    return
+  }
 }
