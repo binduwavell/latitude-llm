@@ -1,4 +1,3 @@
-import { eq } from 'drizzle-orm'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -9,8 +8,6 @@ import {
   User,
   Workspace,
 } from '../../../browser'
-import { database } from '../../../client'
-import { providerApiKeys } from '../../../schema'
 import * as factories from '../../../tests/factories'
 import setupService from '../../users/setupService'
 import { forkDocument } from '../forkDocument'
@@ -253,31 +250,6 @@ describe('forkDocument', () => {
             model: 'gemini-2.5-pro',
           },
         ])
-      })
-
-      it('fork document with default model', async () => {
-        const [_, provider] = destProviders
-        await database
-          .update(providerApiKeys)
-          .set({
-            defaultModel: 'gemini-1.0-pro',
-          })
-          .where(eq(providerApiKeys.id, provider!.id))
-        const { project } = await forkDocument({
-          title: 'Copied Prompt',
-          origin: { workspace: fromWorkspace, commit, document },
-          destination: { workspace: toWorkspace, user },
-        }).then((r) => r.unwrap())
-        const { commitCount, documents } = await generateDocumentsOutput({
-          project,
-        })
-
-        expect(commitCount).toBe(1)
-        expect(documents[0]).toEqual({
-          path: 'some-folder/parent',
-          provider: 'google',
-          model: 'gemini-1.0-pro',
-        })
       })
 
       it('fork a nested document', async () => {

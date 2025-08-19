@@ -8,11 +8,10 @@ import { DocumentVersionProvider } from '$/app/providers/DocumentProvider'
 import { ROUTES } from '$/services/routes'
 import { redirect } from 'next/navigation'
 
-import DocumentsLayout from '../../_components/DocumentsLayout'
+import ProjectLayout from '../../_components/ProjectLayout'
 import DocumentationModal, {
   DocumentationModalProvider,
 } from './_components/DocumentationModal'
-import DocumentTabs from './_components/DocumentTabs'
 import buildMetatags from '$/app/_lib/buildMetatags'
 
 export const metadata = buildMetatags({
@@ -48,7 +47,7 @@ export default async function DocumentPage({
         projectId={projectId}
         commitUuid={commitUuid}
       >
-        <DocumentsLayout
+        <ProjectLayout
           projectId={projectId}
           commitUuid={commitUuid}
           document={document}
@@ -59,11 +58,9 @@ export default async function DocumentPage({
               commitUuid={commitUuid}
               apiKeys={apiKeys}
             />
-            <DocumentTabs document={document} params={paramsAwaited}>
-              {children}
-            </DocumentTabs>
+            {children}
           </DocumentationModalProvider>
-        </DocumentsLayout>
+        </ProjectLayout>
       </DocumentVersionProvider>
     )
   } catch (error) {

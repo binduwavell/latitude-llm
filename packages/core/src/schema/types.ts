@@ -14,7 +14,7 @@ import {
   EvaluationType,
   EvaluationV2,
 } from '../constants'
-import { DocumentTriggerWithConfiguration } from '../services/documentTriggers/helpers/schema'
+import { DocumentTriggerWithConfiguration } from '@latitude-data/constants/documentTriggers'
 import { IntegrationConfiguration } from '../services/integrations/helpers/schema'
 import { connectedEvaluations } from './legacyModels/connectedEvaluations'
 import { evaluationAdvancedTemplates } from './legacyModels/evaluationAdvancedTemplates'
@@ -259,6 +259,14 @@ export type PipedreamIntegration = Extract<
   IntegrationDto,
   { type: IntegrationType.Pipedream }
 >
+
+export type PipedreamIntegrationWithAcountCount = PipedreamIntegration & {
+  accountCount: number
+}
+export type PipedreamIntegrationWithCounts =
+  PipedreamIntegrationWithAcountCount & {
+    triggerCount: number
+  }
 
 type _DocumentTrigger = InferSelectModel<typeof documentTriggers>
 export type DocumentTrigger = Omit<_DocumentTrigger, 'configuration' | 'type'> &

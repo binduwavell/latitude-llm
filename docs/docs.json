@@ -48,7 +48,8 @@
                 "group": "Onboarding Paths",
                 "pages": [
                   "guides/getting-started/quick-start-pm",
-                  "guides/getting-started/quick-start-dev"
+                  "guides/getting-started/quick-start-dev",
+                  "guides/contribution/contributors"
                 ]
               },
               {
@@ -81,6 +82,7 @@
             "group": "Agents",
             "pages": [
               "guides/prompt-manager/agents",
+              "guides/prompt-manager/subagents",
               {
                 "group": "Integrations",
                 "pages": [
@@ -146,6 +148,12 @@
             "pages": [
               "guides/self-hosted/development-setup",
               "guides/self-hosted/production-setup"
+            ]
+          },
+          {
+            "group": "Changelog",
+            "pages": [
+              "changelog/overview"
             ]
           },
           {
@@ -262,17 +270,6 @@
               "examples/cases/content-moderation-system",
               "examples/cases/customer-support-quality-assurance",
               "examples/cases/startup-analysis"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Changelog",
-        "groups": [
-          {
-            "group": "Changelog",
-            "pages": [
-              "changelog/changelog"
             ]
           }
         ]

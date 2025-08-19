@@ -1,3 +1,5 @@
+'use client'
+
 import useIntegrations from '$/stores/integrations'
 import { IntegrationType } from '@latitude-data/constants'
 import type { PipedreamIntegrationConfiguration } from '@latitude-data/core/services/integrations/helpers/schema'
@@ -65,6 +67,11 @@ export function SlidingCarousel<T>({
     return () => clearInterval(id)
   }, [items.length, interval])
 
+  const item = items[currentIndex]
+  const nextItem = items[nextIndex]
+
+  if (!item || !nextItem) return null
+
   return (
     <div className={`relative overflow-hidden ${className}`}>
       <div
@@ -91,7 +98,6 @@ export function SlidingCarousel<T>({
 
 function IntegrationsPreview() {
   const { data: integrations } = useIntegrations({ withTriggers: true })
-
   const items = useMemo<IntegrationPreviewItem[]>(() => {
     if (!integrations?.length) return DEFAULT_ITEMS
     return [

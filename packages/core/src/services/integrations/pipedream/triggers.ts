@@ -13,13 +13,19 @@ import {
 import { getPipedreamEnvironment } from './apps'
 import { Result } from '../../../lib/Result'
 import { PromisedResult } from '../../../lib/Transaction'
-import { fillConfiguredProps } from './components'
+import {
+  fillConfiguredProps,
+  isIntegrationConfigured,
+} from './components/fillConfiguredProps'
 import { DocumentTriggerType, IntegrationType } from '@latitude-data/constants'
 import { database } from '../../../client'
 import { IntegrationsRepository } from '../../../repositories'
-import { IntegrationTriggerConfiguration } from '../../documentTriggers/helpers/schema'
-import { BadRequestError } from '@latitude-data/constants/errors'
-import { isEqual, omit } from 'lodash-es'
+import {
+  InsertIntegrationTriggerConfiguration,
+  IntegrationTriggerConfiguration,
+} from '@latitude-data/constants/documentTriggers'
+import { BadRequestError, NotFoundError } from '@latitude-data/constants/errors'
+import { isEqual } from 'lodash-es'
 
 export async function deployPipedreamTrigger({
   triggerUuid,
@@ -32,6 +38,14 @@ export async function deployPipedreamTrigger({
   componentId: ComponentId
   configuredProps: ConfiguredProps<ConfigurableProps>
 }): PromisedResult<{ id: string }> {
+  if (!isIntegrationConfigured(integration)) {
+    return Result.error(
+      new BadRequestError(
+        `Integration '${integration.name}' has not been configured.`,
+      ),
+    )
+  }
+
   const pipedreamEnv = getPipedreamEnvironment()
   if (!pipedreamEnv.ok) {
     return Result.error(pipedreamEnv.error!)
@@ -52,10 +66,18 @@ export async function deployPipedreamTrigger({
   const configuredProps = configuredPropsResult.unwrap()
 
   try {
+    // Need the dynamic props id for some components to work correctly (i.e. Github new branch trigger)
+    const reload = await pipedream.reloadComponentProps({
+      externalUserId: integration.configuration.externalUserId,
+      componentId: componentId,
+      configuredProps: configuredPropsResult.unwrap(),
+    })
+
     const deployResult = await pipedream.deployTrigger({
       externalUserId,
       triggerId: componentId,
       configuredProps,
+      dynamicPropsId: reload.dynamicProps?.id,
       webhookUrl: gatewayPath(`/webhook/integration/${triggerUuid}`),
     })
 
@@ -68,21 +90,29 @@ export async function deployPipedreamTrigger({
 export async function updatePipedreamTrigger(
   {
     workspace,
-    originalConfig,
+    trigger,
     updatedConfig,
   }: {
     workspace: Workspace
-    originalConfig: IntegrationTriggerConfiguration
-    updatedConfig: IntegrationTriggerConfiguration
+    trigger: Extract<
+      DocumentTrigger,
+      { triggerType: DocumentTriggerType.Integration }
+    >
+    updatedConfig: InsertIntegrationTriggerConfiguration
   },
   db = database,
 ): PromisedResult<IntegrationTriggerConfiguration, Error> {
+  const originalConfig = trigger.configuration
+
   if (
     originalConfig.integrationId === updatedConfig.integrationId &&
     originalConfig.componentId === updatedConfig.componentId &&
-    isEqual(originalConfig.payloadParameters, updatedConfig.payloadParameters)
+    isEqual(originalConfig.properties, updatedConfig.properties)
   ) {
-    return Result.ok(updatedConfig)
+    return Result.ok({
+      ...updatedConfig,
+      triggerId: originalConfig.triggerId,
+    })
   }
 
   const integrationsScope = new IntegrationsRepository(workspace.id, db)
@@ -113,6 +143,14 @@ export async function updatePipedreamTrigger(
       )
     }
 
+    if (!isIntegrationConfigured(integration)) {
+      return Result.error(
+        new NotFoundError(
+          `Integration '${integration.name}' has not been configured.`,
+        ),
+      )
+    }
+
     const newConfigPropsResult = await fillConfiguredProps({
       pipedream,
       integration,
@@ -129,7 +167,10 @@ export async function updatePipedreamTrigger(
         configuredProps: newConfiguredProps,
       })
 
-      return Result.ok(updatedConfig)
+      return Result.ok({
+        ...updatedConfig,
+        triggerId: originalConfig.triggerId,
+      })
     } catch (error) {
       return Result.error(error as Error)
     }
@@ -155,10 +196,24 @@ export async function updatePipedreamTrigger(
       ),
     )
   }
+  if (!isIntegrationConfigured(oldIntegration)) {
+    return Result.error(
+      new NotFoundError(
+        `Integration '${oldIntegration.name}' has not been configured.`,
+      ),
+    )
+  }
   if (newIntegration.type !== IntegrationType.Pipedream) {
     return Result.error(
       new BadRequestError(
         `Integration type '${newIntegration.type}' is not supported for document triggers`,
+      ),
+    )
+  }
+  if (!isIntegrationConfigured(newIntegration)) {
+    return Result.error(
+      new NotFoundError(
+        `Integration '${newIntegration.name}' has not been configured.`,
       ),
     )
   }
@@ -173,7 +228,7 @@ export async function updatePipedreamTrigger(
   }
 
   const deployResult = await deployPipedreamTrigger({
-    triggerUuid: updatedConfig.triggerId,
+    triggerUuid: trigger.uuid,
     integration: newIntegration,
     componentId: { key: updatedConfig.componentId },
     configuredProps: updatedConfig.properties ?? {},
@@ -182,11 +237,10 @@ export async function updatePipedreamTrigger(
   if (!Result.isOk(deployResult)) return deployResult
   const deployedTrigger = deployResult.unwrap()
 
-  const newConfig = {
-    ...omit(updatedConfig, ['triggerId']),
+  return Result.ok({
+    ...updatedConfig,
     triggerId: deployedTrigger.id,
-  }
-  return Result.ok(newConfig) // Updated config with new deployed trigger
+  }) // Updated config with new deployed trigger
 }
 
 export async function destroyPipedreamTrigger(
@@ -215,6 +269,13 @@ export async function destroyPipedreamTrigger(
     return Result.error(
       new Error(
         `Integration type '${integration.type}' is not supported for document triggers`,
+      ),
+    )
+  }
+  if (!isIntegrationConfigured(integration)) {
+    return Result.error(
+      new NotFoundError(
+        `Integration '${integration.name}' has not been configured.`,
       ),
     )
   }

@@ -1,4 +1,4 @@
-import { LIVE_EVALUABLE_LOG_SOURCES, LogSources } from '../../browser'
+import { LogSources } from '../../browser'
 import {
   findLastProviderLogFromDocumentLogUuid,
   findWorkspaceFromDocumentLog,
@@ -14,6 +14,10 @@ import {
 import { getEvaluationMetricSpecification } from '../../services/evaluationsV2/specifications'
 import { DocumentLogCreatedEvent } from '../events'
 
+const LIVE_EVALUABLE_LOG_SOURCES = Object.values(LogSources).filter(
+  (source) => source !== 'evaluation' && source !== 'experiment',
+) as LogSources[]
+
 export const evaluateLiveLogJob = async ({
   data: event,
 }: {
@@ -21,8 +25,10 @@ export const evaluateLiveLogJob = async ({
 }) => {
   const { id, workspaceId } = event.data
   const repo = new DocumentLogsRepository(workspaceId)
-  const documentLog = await repo.find(id).then((r) => r.unwrap())
+  const documentLogResult = await repo.find(id)
+  if (documentLogResult.error) return
 
+  const documentLog = documentLogResult.unwrap()
   const workspace = await findWorkspaceFromDocumentLog(documentLog)
   if (!workspace) {
     throw new NotFoundError(

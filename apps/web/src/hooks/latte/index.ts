@@ -1,50 +1,95 @@
+'use client'
+
 import { addMessageToLatteAction } from '$/actions/latte/addMessage'
 import { createNewLatteAction } from '$/actions/latte/new'
 import { useSockets } from '$/components/Providers/WebsocketsProvider/useSockets'
 import { useServerAction } from 'zsa-react'
 
-import { useCallback, useMemo, useState } from 'react'
-import {
-  LatteInteraction,
-  LatteInteractionStep,
-  LatteToolStep,
-  LatteActionStep,
-} from './types'
-import { getDescriptionFromToolCall } from './helpers'
+import { acceptLatteChangesAction } from '$/actions/latte/acceptChanges'
+import { addFeedbackToLatteChangeAction } from '$/actions/latte/addFeedbackToLatteChange'
+import { discardLatteChangesActions } from '$/actions/latte/discardChanges'
+import { useFeatureFlag } from '$/components/Providers/FeatureFlags'
 import { trigger } from '$/lib/events'
-import { useLatteContext } from './context'
+import { ROUTES } from '$/services/routes'
+import { useCurrentUser } from '$/stores/currentUser'
+import { useLatteStore } from '$/stores/latte'
+import useProviderLogs from '$/stores/providerLogs'
 import {
   LatteChange,
   LatteEditAction,
   LatteTool,
 } from '@latitude-data/constants/latte'
-import { acceptLatteChangesAction } from '$/actions/latte/acceptChanges'
-import { discardLatteChangesActions } from '$/actions/latte/discardChanges'
-import { addFeedbackToLatteChangeAction } from '$/actions/latte/addFeedbackToLatteChange'
 import { LatteThreadUpdateArgs } from '@latitude-data/core/browser'
+import { LatteVersion } from '@latitude-data/core/services/copilot/latte/debugVersions'
+import {
+  AppLocalStorage,
+  useLocalStorage,
+} from '@latitude-data/web-ui/hooks/useLocalStorage'
+import { sortBy } from 'lodash-es'
+import { useCallback, useEffect, useMemo } from 'react'
+import useSWR from 'swr'
+import useFetcher from '../useFetcher'
+import { useOnce } from '../useMount'
+import { useLatteContext } from './context'
+import { getDescriptionFromToolCall } from './helpers'
+import {
+  LatteActionStep,
+  LatteInteraction,
+  LatteInteractionStep,
+  LatteToolStep,
+} from './types'
 
-export function useLatte() {
-  const [threadUuid, setThreadUuid] = useState<string>()
-  const [isLoading, setIsLoading] = useState(false)
+const EMPTY_ARRAY = [] as const
 
-  const [interactions, setInteractions] = useState<LatteInteraction[]>([])
-  const [error, setError] = useState<string>()
-  const [changes, setChanges] = useState<LatteChange[]>([])
+/**
+ * Synchronizes the Latte thread UUID with local storage on mount.
+ * Reads the thread UUID from local storage on component mount and updates the store accordingly.
+ */
+export function useSyncLatteUrlState() {
+  const { threadUuid, setThreadUuid } = useLatteStore()
+  const { value: storedThreadUuid, setValue: setStoredThreadUuid } =
+    useLocalStorage<string | undefined>({
+      key: AppLocalStorage.latteThreadUuid,
+      defaultValue: undefined,
+    })
 
-  const [latteActionsFeedbackUuid, setLatteActionsFeedbackUuid] =
-    useState<string>()
+  useOnce(() => {
+    // If `threadUuid` exists and `storedThreadUuid` does not, set the local storage to `threadUuid`
+    // If both `threadUuid` and `storedThreadUuid` exist, update the local storage to `threadUuid`
+    // If `threadUuid` does not exist but `storedThreadUuid` does, set `threadUuid` to `storedThreadUuid`
+    // If neither `threadUuid` nor `storedThreadUuid` exist, do nothing
+    if (storedThreadUuid) {
+      if (threadUuid) {
+        if (threadUuid !== storedThreadUuid) {
+          setStoredThreadUuid(threadUuid)
+        }
+      } else {
+        setThreadUuid(storedThreadUuid)
+      }
+    } else {
+      if (threadUuid) {
+        setStoredThreadUuid(threadUuid)
+      }
+    }
+  })
+}
 
+/**
+ * Provides chat actions for Latte conversations including creating new chats and sending messages.
+ *
+ * @returns An object containing:
+ *   - `sendMessage`: Function to send a message to the current or new Latte thread
+ */
+export function useLatteChatActions() {
   const latteContext = useLatteContext()
-
-  const resetChat = useCallback(() => {
-    setThreadUuid(undefined)
-    setInteractions([])
-    setIsLoading(false)
-    setError(undefined)
-    setChanges([])
-    setLatteActionsFeedbackUuid(undefined)
-  }, [])
-
+  const {
+    threadUuid,
+    setThreadUuid,
+    setIsLoading,
+    setError,
+    addInteractions,
+    debugVersionUuid,
+  } = useLatteStore()
   const { execute: createNewChat } = useServerAction(createNewLatteAction, {
     onSuccess: ({ data }) => {
       setThreadUuid(data.uuid)
@@ -65,6 +110,55 @@ export function useLatte() {
     },
   )
 
+  const sendMessage = useCallback(
+    async (message: string) => {
+      setIsLoading(true)
+
+      const newInteraction: LatteInteraction = {
+        input: message,
+        steps: [],
+        output: undefined,
+      }
+
+      addInteractions([newInteraction])
+
+      const context = await latteContext()
+
+      if (threadUuid) addMessageToExistingChat({ threadUuid, message, context })
+      else createNewChat({ message, context, debugVersionUuid })
+    },
+    [
+      addInteractions,
+      addMessageToExistingChat,
+      createNewChat,
+      latteContext,
+      setIsLoading,
+      threadUuid,
+      debugVersionUuid,
+    ],
+  )
+
+  return { sendMessage }
+}
+
+/**
+ * Provides actions for managing Latte project changes including accepting, undoing, and providing feedback.
+ *
+ * @returns An object containing:
+ *   - `acceptChanges`: Function to accept all pending changes
+ *   - `undoChanges`: Function to undo all pending changes
+ *   - `addFeedbackToLatteChange`: Function to add feedback to a specific change
+ */
+export function useLatteChangeActions() {
+  const {
+    threadUuid,
+    changes,
+    setChanges,
+    setLatteActionsFeedbackUuid,
+    setIsLoading,
+    setError,
+  } = useLatteStore()
+
   const { execute: executeAcceptChanges } = useServerAction(
     acceptLatteChangesAction,
     {
@@ -79,6 +173,7 @@ export function useLatte() {
       },
     },
   )
+
   const { execute: executeUndoChanges } = useServerAction(
     discardLatteChangesActions,
     {
@@ -102,6 +197,7 @@ export function useLatte() {
       },
     },
   )
+
   const { execute: executeAddFeedbackToLatteChange } = useServerAction(
     addFeedbackToLatteChangeAction,
     {
@@ -114,56 +210,53 @@ export function useLatte() {
       },
     },
   )
+
   const acceptChanges = useCallback(() => {
     if (!threadUuid) return
     setIsLoading(true)
     executeAcceptChanges({ threadUuid })
-  }, [threadUuid, executeAcceptChanges])
+  }, [threadUuid, executeAcceptChanges, setIsLoading])
+
   const undoChanges = useCallback(() => {
     if (!threadUuid) return
     setIsLoading(true)
     executeUndoChanges({ threadUuid })
-  }, [threadUuid, executeUndoChanges])
+  }, [threadUuid, executeUndoChanges, setIsLoading])
+
   const addFeedbackToLatteChange = useCallback(
-    (feedback: string) => {
+    (feedback: string, evaluationResultUuid?: string) => {
       setLatteActionsFeedbackUuid(undefined)
-      if (!latteActionsFeedbackUuid) return
+
+      if (!evaluationResultUuid) return
       if (feedback.trim() === '') return
       setIsLoading(true)
       executeAddFeedbackToLatteChange({
         content: feedback,
-        evaluationResultUuid: latteActionsFeedbackUuid,
+        evaluationResultUuid,
       })
     },
-    [latteActionsFeedbackUuid, executeAddFeedbackToLatteChange],
+    [
+      executeAddFeedbackToLatteChange,
+      setLatteActionsFeedbackUuid,
+      setIsLoading,
+    ],
   )
 
-  const sendMessage = useCallback(
-    (message: string) => {
-      setIsLoading(true)
+  return {
+    acceptChanges,
+    undoChanges,
+    addFeedbackToLatteChange,
+  }
+}
 
-      const newInteraction: LatteInteraction = {
-        input: message,
-        steps: [],
-        output: undefined,
-      }
-
-      if (threadUuid) {
-        setInteractions((prev) => [...prev, newInteraction])
-        addMessageToExistingChat({
-          threadUuid,
-          message,
-          context: latteContext(),
-        })
-        return
-      }
-
-      setInteractions([newInteraction])
-      createNewChat({ message, context: latteContext() })
-    },
-    [threadUuid, addMessageToExistingChat, createNewChat, latteContext],
-  )
-
+/**
+ * Handles real-time updates from the Latte thread via WebSocket connections.
+ * Processes different types of updates including response deltas, tool completions,
+ * and tool starts, updating the interactions state accordingly.
+ */
+export function useLatteThreadUpdates() {
+  const { threadUuid, setInteractions, setIsLoading, setError } =
+    useLatteStore()
   const handleThreadUpdate = useCallback(
     (update: LatteThreadUpdateArgs) => {
       const currentTimeAsString = new Date().toString()
@@ -266,13 +359,23 @@ export function useLatte() {
         return [...otherInteractions, lastInteraction]
       })
     },
-    [threadUuid],
+    [threadUuid, setInteractions, setIsLoading, setError],
   )
 
   useSockets({
     event: 'latteThreadUpdate',
     onMessage: handleThreadUpdate,
   })
+}
+
+/**
+ * Handles real-time project changes from the Latte thread via WebSocket connections.
+ * Processes incoming changes and updates the changes state, handling additions,
+ * updates, and removals of changes based on the current thread.
+ */
+export function useLatteProjectChanges() {
+  const { threadUuid, setChanges, setLatteActionsFeedbackUuid } =
+    useLatteStore()
 
   useSockets({
     event: 'latteProjectChanges',
@@ -325,31 +428,133 @@ export function useLatte() {
       })
     },
   })
+}
+
+/**
+ * Loads and transforms provider logs into Latte interactions.
+ * Fetches provider logs for the current thread UUID and converts them
+ * into a structured format of user-assistant interactions with input/output pairs.
+ * Only runs if there are no previous interactions stored in the current chat state so to avoid overriding the current state.
+ */
+export function useLoadThreadFromProviderLogs() {
+  const { interactions, setInteractions } = useLatteStore()
+  const { providerLog, isLoading } = useLatteThreadProviderLog()
+
+  useEffect(() => {
+    if (interactions.length > 0) return
+    if (!providerLog) return
+
+    // iterate over provider log messages and transform them to an array of interactions. Interactors are input/output pairs input defined as any message from a user and outputs defined as all messages not from user until the next user message.
+    const messages = providerLog.messages || []
+    const _interactions: LatteInteraction[] = []
+    let currentInteraction: LatteInteraction | null = null
+
+    for (const message of messages) {
+      if (message.role === 'user') {
+        // Start a new interaction for user messages
+        if (currentInteraction) {
+          _interactions.push(currentInteraction)
+        }
+        currentInteraction = {
+          input:
+            message.content.filter((t) => t.type === 'text').at(-1)?.text ?? '',
+          steps: [],
+          output: undefined,
+        }
+      } else if (message.role === 'assistant' && currentInteraction) {
+        currentInteraction.output =
+          typeof message.content === 'string'
+            ? message.content
+            : // @ts-expect-error - cast message content to TextContent
+              (message.content.filter((t) => t.type === 'text').at(-1)?.text ??
+              '')
+      }
+    }
+
+    // Add the last interaction if it exists
+    if (currentInteraction) {
+      currentInteraction.output = providerLog.response
+
+      _interactions.push(currentInteraction)
+    }
+
+    // Update the interactions state if we have any
+    if (_interactions.length > 0) {
+      setInteractions(_interactions)
+    }
+  }, [providerLog, setInteractions, interactions])
+
+  return isLoading
+}
+
+/**
+ * Fetches the latest provider log for the current thread UUID.
+ */
+const useLatteThreadProviderLog = () => {
+  const { threadUuid } = useLatteStore()
+  const { data: providerLogs, ...rest } = useProviderLogs({
+    documentLogUuid: threadUuid,
+  })
+  const providerLog = useMemo(
+    () => sortBy(providerLogs, 'generatedAt').at(-1),
+    [providerLogs],
+  )
+
+  return useMemo(() => ({ providerLog, ...rest }), [providerLog, rest])
+}
+
+/**
+ * Handles debug data
+ */
+export function useLatteDebugMode() {
+  const { debugVersionUuid, setDebugVersionUuid } = useLatteStore()
+  const { enabled: debugModeEnabled } = useFeatureFlag({
+    featureFlag: 'latteDebugMode',
+  })
+  const { data: user } = useCurrentUser()
+
+  const enabled = debugModeEnabled && user?.admin
+
+  const fetcher = useFetcher<LatteVersion[]>(
+    enabled ? ROUTES.api.latte.debug.versions.root : undefined,
+  )
+
+  const { data = EMPTY_ARRAY, isLoading } = useSWR<LatteVersion[]>(
+    ['latteDebugVersions'],
+    fetcher,
+  )
+
+  const selectedVersionUuid = useMemo(() => {
+    if (!enabled) return undefined
+    if (!data) return debugVersionUuid
+
+    if (data.some((version) => version.uuid == debugVersionUuid)) {
+      return debugVersionUuid
+    }
+
+    return data.find((version) => version.isLive)?.uuid
+  }, [enabled, debugVersionUuid, data])
+
+  useEffect(() => {
+    // When the list of versions has loaded, if the selected debugVersionUuid is not on the list, automatically unset it
+    if (isLoading) return
+    if (!debugVersionUuid) return
+
+    if (data.some((version) => version.uuid === debugVersionUuid)) {
+      return
+    }
+
+    setDebugVersionUuid(undefined)
+  }, [isLoading, debugVersionUuid, data, setDebugVersionUuid])
 
   return useMemo(
     () => ({
-      sendMessage,
-      resetChat,
+      enabled,
+      data,
       isLoading,
-      interactions,
-      error,
-      changes,
-      acceptChanges,
-      undoChanges,
-      feedbackRequested: !!latteActionsFeedbackUuid,
-      addFeedbackToLatteChange,
+      selectedVersionUuid,
+      setSelectedVersionUuid: setDebugVersionUuid,
     }),
-    [
-      sendMessage,
-      resetChat,
-      isLoading,
-      interactions,
-      error,
-      changes,
-      acceptChanges,
-      undoChanges,
-      latteActionsFeedbackUuid,
-      addFeedbackToLatteChange,
-    ],
+    [enabled, data, selectedVersionUuid, isLoading, setDebugVersionUuid],
   )
 }

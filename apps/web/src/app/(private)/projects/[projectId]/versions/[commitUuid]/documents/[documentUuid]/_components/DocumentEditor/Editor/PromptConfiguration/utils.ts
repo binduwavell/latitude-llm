@@ -84,7 +84,7 @@ export const useLatitudeAgentsConfig = ({
   const { project } = useCurrentProject()
   const { document } = useCurrentDocument()
 
-  const { data: agentToolsMap } = useAgentToolsMap({
+  const { data: agentToolsMap, isLoading } = useAgentToolsMap({
     commitUuid: commit?.uuid,
     projectId: project.id,
   })
@@ -106,9 +106,10 @@ export const useLatitudeAgentsConfig = ({
   })
 
   const selectedAgentsFullPaths = useMemo(() => {
-    return selectedAgents.map((relativePath) =>
-      resolveRelativePath(relativePath, document.path),
-    )
+    if (!Array.isArray(selectedAgents)) return []
+    return selectedAgents
+      .filter(Boolean)
+      .map((relativePath) => resolveRelativePath(relativePath, document.path))
   }, [selectedAgents, document.path])
 
   const toggleAgent = useCallback(
@@ -141,6 +142,7 @@ export const useLatitudeAgentsConfig = ({
     availableAgents,
     selectedAgents: selectedAgentsFullPaths,
     toggleAgent,
+    isLoading,
   }
 }
 

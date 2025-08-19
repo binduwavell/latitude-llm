@@ -1,25 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Config } from 'promptl-ai'
-import { ClientOnly } from '@latitude-data/web-ui/atoms/ClientOnly'
-import { Text } from '@latitude-data/web-ui/atoms/Text'
-import { CollapsibleBox } from '@latitude-data/web-ui/molecules/CollapsibleBox'
-import { SwitchToggle } from '@latitude-data/web-ui/atoms/Switch'
-import { Tooltip } from '@latitude-data/web-ui/atoms/Tooltip'
-import { Icon } from '@latitude-data/web-ui/atoms/Icons'
 import useIntegrations from '$/stores/integrations'
-import { IntegrationsList } from '../../PromptIntegrations/IntegrationsList'
-import { ItemWrapper } from '../../PromptIntegrations/IntegrationTools'
-import { useActiveIntegrations } from '../../PromptIntegrations/useActiveIntegrations'
-import { EditorHeaderProps } from '../index'
+import { updatePromptMetadata } from '@latitude-data/core/lib/updatePromptMetadata'
+import { ClientOnly } from '@latitude-data/web-ui/atoms/ClientOnly'
+import { Icon } from '@latitude-data/web-ui/atoms/Icons'
+import { Skeleton } from '@latitude-data/web-ui/atoms/Skeleton'
+import { SwitchToggle } from '@latitude-data/web-ui/atoms/Switch'
+import { Text } from '@latitude-data/web-ui/atoms/Text'
+import { Tooltip } from '@latitude-data/web-ui/atoms/Tooltip'
+import { CollapsibleBox } from '@latitude-data/web-ui/molecules/CollapsibleBox'
 import { TabSelector } from '@latitude-data/web-ui/molecules/TabSelector'
+import { cn } from '@latitude-data/web-ui/utils'
+import { Config } from 'promptl-ai'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   UseLatitudeAgentsConfig,
   useLatitudeAgentsConfig,
 } from '../../PromptConfiguration/utils'
-import { updatePromptMetadata } from '@latitude-data/core/lib/updatePromptMetadata'
+import { IntegrationsList } from '../../PromptIntegrations/IntegrationsList'
+import { ItemWrapper } from '../../PromptIntegrations/IntegrationTools'
+import {
+  ActiveIntegrations,
+  useActiveIntegrations,
+} from '../../PromptIntegrations/useActiveIntegrations'
+import { EditorHeaderProps } from '../index'
 
 const singularPluralLabel = (c: number, s: string, p: string) =>
-  c === 0 ? `0 ${p}` : c === 1 ? `1 ${s}` : `${c} ${p} `
+  c === 1 ? `1 ${s}` : `${c} ${p}`
 
 export const TAB_SECTIONS = {
   tools: 'tools',
@@ -61,7 +66,7 @@ function useCounters({
   prompt: EditorHeaderProps['prompt']
   onChangePrompt: EditorHeaderProps['onChangePrompt']
 }) {
-  const { data: integrations, isLoading } = useIntegrations({
+  const { isLoading } = useIntegrations({
     includeLatitudeTools: true,
     withTools: true,
   })
@@ -72,31 +77,26 @@ function useCounters({
     [prompt, onChangePrompt],
   )
 
+  const { isInitialized, activeIntegrations } = useActiveIntegrations({
+    prompt,
+  })
+  const toolsCount = Object.keys(activeIntegrations).length
+  const toolsLabel =
+    toolsCount > 0
+      ? singularPluralLabel(toolsCount, 'Tool', 'Tools')
+      : 'No tools'
+
   const subAgents = useLatitudeAgentsConfig({
     config,
     setConfig,
     canUseSubagents: true,
   })
-
-  const { isInitialized, activeIntegrations } = useActiveIntegrations({
-    prompt,
-    integrations,
-    isLoading,
-    onChangePrompt,
-  })
-  const toolsCount = Object.keys(activeIntegrations).length
-  const toolsLabel = !isInitialized
-    ? 'Loading tools...'
-    : toolsCount > 0
-      ? `${toolsCount} tool${toolsCount > 1 ? 's' : ''}`
-      : 'No tools used'
-
   const subAgentsCount = subAgents.selectedAgents.length
-  const subAgentsLabel = singularPluralLabel(
-    subAgentsCount,
-    'Sub-agent',
-    'Sub-agents',
-  )
+  const subAgentsLabel =
+    subAgentsCount > 0
+      ? singularPluralLabel(subAgentsCount, 'Sub-agent', 'Sub-agents')
+      : 'No sub-agents'
+
   return useMemo(
     () => ({
       toolsLabel,
@@ -104,8 +104,17 @@ function useCounters({
       subAgentsLabel,
       subAgentsCount,
       subAgents,
+      isLoading: !isInitialized || isLoading || subAgents.isLoading,
     }),
-    [toolsLabel, toolsCount, subAgentsLabel, subAgentsCount, subAgents],
+    [
+      toolsLabel,
+      toolsCount,
+      subAgentsLabel,
+      subAgentsCount,
+      subAgents,
+      isInitialized,
+      isLoading,
+    ],
   )
 }
 
@@ -164,7 +173,6 @@ function SubAgentItem({
 }
 function Content({
   isMerged,
-  onChangePrompt,
   prompt,
   selectedTab,
   subAgents,
@@ -172,39 +180,32 @@ function Content({
   isMerged: EditorHeaderProps['isMerged']
   selectedTab: TabSection
   prompt: EditorHeaderProps['prompt']
-  onChangePrompt: EditorHeaderProps['onChangePrompt']
   subAgents: UseLatitudeAgentsConfig
 }) {
   const { data: integrations, isLoading } = useIntegrations({
     includeLatitudeTools: true,
     withTools: true,
   })
-  const {
-    isInitialized,
-    activeIntegrations,
-    addIntegrationTool,
-    removeIntegrationTool,
-  } = useActiveIntegrations({
-    prompt,
-    onChangePrompt,
-    integrations,
-    isLoading,
-  })
+  const { activeIntegrations, addIntegrationTool, removeIntegrationTool } =
+    useActiveIntegrations({
+      prompt,
+    })
+
   return (
     <>
       {selectedTab === TAB_SECTIONS.tools ? (
         <IntegrationsList
           disabled={isMerged}
-          isLoading={!isInitialized}
+          isLoading={isLoading}
           integrations={integrations ?? []}
-          activeIntegrations={activeIntegrations}
+          activeIntegrations={activeIntegrations as ActiveIntegrations}
           addIntegrationTool={addIntegrationTool}
           removeIntegrationTool={removeIntegrationTool}
         />
       ) : null}
 
       {selectedTab === TAB_SECTIONS.subAgents ? (
-        <ul className='bg-backgroundCode'>
+        <ul className='bg-backgroundCode overflow-auto custom-scrollbar'>
           {subAgents.availableAgents.map((agent, index) => (
             <li key={agent}>
               <SubAgentItem
@@ -220,6 +221,10 @@ function Content({
       ) : null}
     </>
   )
+}
+
+function AgentToolbarSkeleton() {
+  return <Skeleton className='h-[3.125rem] w-full rounded-lg' />
 }
 
 export function AgentToolbar({
@@ -241,78 +246,83 @@ export function AgentToolbar({
     subAgentsCount: counters.subAgentsCount,
   })
   const [agent, setAgent] = useState(isAgent)
+  useEffect(() => setAgent(isAgent), [isAgent]) // TODO: remove the local state and this useEffect
   const [isExpanded, setIsExpanded] = useState<boolean>(false)
-  const onToggle = useCallback(
-    (nextIsExpanded: boolean) => {
-      // Non-agent prompts should not be expanded
-      if (!isAgent) return
-
-      setIsExpanded(nextIsExpanded)
-    },
-    [isAgent],
-  )
   const onAgentToggle = useCallback(
     async (checked: boolean) => {
       setAgent(checked)
       setIsExpanded(checked)
-
       onChangePrompt(
         updatePromptMetadata(prompt, handleAgentChange({ checked, config })),
       )
     },
     [config, prompt, onChangePrompt],
   )
-
-  useEffect(() => {
-    setAgent(isAgent)
-  }, [isAgent])
+  const onToggle = useCallback(
+    (nextIsExpanded: boolean) => {
+      if (isMerged || !agent) return
+      setIsExpanded(nextIsExpanded)
+    },
+    [agent, isMerged],
+  )
 
   return (
-    <ClientOnly>
-      <CollapsibleBox
-        paddingLeft={false}
-        paddingRight={false}
-        paddingBottom={false}
-        avoidToggleOnTitleClick
-        isExpanded={isExpanded}
-        onToggle={onToggle}
-        collapsedContentHeader={
-          <div className='flex justify-end'>
-            <Text.H5 color='foregroundMuted'>
-              {counters.toolsLabel}
-              {' · '}
-              {counters.subAgentsLabel}
-            </Text.H5>
-          </div>
-        }
-        title={
-          <div className='flex items-center gap-x-2'>
-            <Text.H5>Agent</Text.H5>
-            <SwitchToggle checked={agent} onCheckedChange={onAgentToggle} />
-            <Tooltip trigger={<Icon name='info' color='foregroundMuted' />}>
-              Prompt needs to be an agent to use tools and sub-agents.
-            </Tooltip>
-          </div>
-        }
-        expandedContent={
-          <div className='w-full flex flex-col overflow-hidden'>
-            <div className='flex justify-center border-b border-border pb-4'>
-              <TabSelector<TabSection>
-                options={tabs.options}
-                selected={tabs.selected}
-                onSelect={tabs.setTab}
+    <ClientOnly loader={<AgentToolbarSkeleton />}>
+      {counters.isLoading ? (
+        <AgentToolbarSkeleton />
+      ) : (
+        <CollapsibleBox
+          paddingLeft={false}
+          paddingRight={false}
+          paddingBottom={false}
+          scrollable={false}
+          handleIcon={agent}
+          avoidToggleOnTitleClick
+          headerClassName={cn({ '!cursor-default': !agent })}
+          isExpanded={isExpanded}
+          onToggle={onToggle}
+          collapsedContentHeader={
+            <div className='flex justify-end'>
+              <Text.H5 color='foregroundMuted' userSelect={false}>
+                {counters.toolsLabel}
+                {' · '}
+                {counters.subAgentsLabel}
+              </Text.H5>
+            </div>
+          }
+          title={
+            <div className='flex items-center gap-x-2'>
+              <Text.H5 userSelect={false}>Agent</Text.H5>
+              <SwitchToggle
+                checked={agent}
+                onCheckedChange={onAgentToggle}
+                disabled={isMerged}
+              />
+              <Tooltip trigger={<Icon name='info' color='foregroundMuted' />}>
+                Make the prompt an agent to use tools and other agents
+              </Tooltip>
+            </div>
+          }
+          expandedContent={
+            <div className='w-full flex flex-col overflow-hidden max-h-[calc((100vh/2)-10rem)]'>
+              <div className='flex justify-center border-b border-border pb-4 px-4'>
+                <TabSelector<TabSection>
+                  options={tabs.options}
+                  selected={tabs.selected}
+                  onSelect={tabs.setTab}
+                  fullWidth
+                />
+              </div>
+              <Content
+                isMerged={isMerged}
+                prompt={prompt}
+                selectedTab={tabs.selected}
+                subAgents={counters.subAgents}
               />
             </div>
-            <Content
-              isMerged={isMerged}
-              prompt={prompt}
-              selectedTab={tabs.selected}
-              onChangePrompt={onChangePrompt}
-              subAgents={counters.subAgents}
-            />
-          </div>
-        }
-      />
+          }
+        />
+      )}
     </ClientOnly>
   )
 }

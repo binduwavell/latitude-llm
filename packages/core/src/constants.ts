@@ -11,19 +11,23 @@ import {
   LatitudeToolInternalName,
   LogSources,
 } from '@latitude-data/constants'
-import { FinishReason, LanguageModelUsage, Tool } from 'ai'
+import { FinishReason, LanguageModelUsage, Tool, ToolResultPart } from 'ai'
 import { z } from 'zod'
 
 import { App, ConfigurableProps, V1Component } from '@pipedream/sdk/browser'
 import type {
+  ApiKey,
   Commit,
   DocumentVersion,
   EvaluationV2,
+  Otlp,
   ProviderLog,
+  Workspace,
 } from './browser'
 import { PromisedResult } from './lib/Transaction'
 import { LatitudeError } from './lib/errors'
 import { TelemetryContext } from '@latitude-data/telemetry'
+import { ConfigurableProp, PropOption } from '@pipedream/sdk'
 
 export {
   DocumentType,
@@ -35,9 +39,13 @@ export {
   ModifiedDocumentType,
   StreamEventTypes,
   type LegacyChainEvent,
+  EMAIL_REGEX,
+  isSafeUrl,
+  isLatitudeUrl,
 } from '@latitude-data/constants'
 export * from '@latitude-data/constants/evaluations'
 export * from '@latitude-data/constants/tracing'
+export * from '@latitude-data/constants/actions'
 
 export const LATITUDE_EVENT = 'latitudeEventsChannel'
 export const LATITUDE_DOCS_URL = 'https://docs.latitude.so'
@@ -73,6 +81,8 @@ type BaseResponse = {
   chainCompleted?: boolean
   documentLogUuid?: string
   providerLog?: ProviderLog
+  // TODO(promptl): move this message type to promptl and call it ToolResultMessage
+  output?: (AssistantMessage | { role: 'tool'; content: ToolResultPart[] })[]
 }
 
 export type ChainStepTextResponse = BaseResponse & {
@@ -432,6 +442,7 @@ export const CLOUD_MESSAGES = {
   refinePrompt: `Prompt refiner is only available on Latitude Cloud. ${CLOUD_INFO}`,
   promptSuggestions: `Prompt suggestions are only available on Latitude Cloud. ${CLOUD_INFO}`,
   documentSuggestions: `Document suggestions are only available on Latitude Cloud. ${CLOUD_INFO}`,
+  generateAgentDetails: `Agent details generator is only available on Latitude Cloud. ${CLOUD_INFO}`,
 }
 
 export const LATITUDE_TOOLS_CONFIG_NAME = 'latitudeTools'
@@ -505,4 +516,42 @@ export type PipedreamComponent<T extends PipedreamComponentType = any> = Omit<
 export type AppDto = App & {
   tools: PipedreamComponent<PipedreamComponentType.Tool>[]
   triggers: PipedreamComponent<PipedreamComponentType.Trigger>[]
+}
+
+export type SpanBulkProcessingData = {
+  spans: Array<{
+    span: Otlp.Span
+    scope: Otlp.Scope
+    resource: Otlp.Resource
+    apiKey: ApiKey
+    workspace: Workspace
+  }>
+}
+
+export type ConfigurablePropWithRemoteOptions = ConfigurableProp & {
+  remoteOptionValues?: RemoteOptions
+}
+
+export class RemoteOptions {
+  public remoteOptions: PropOption[] | string[]
+  constructor(remoteOptions: PropOption[] | string[]) {
+    this.remoteOptions = remoteOptions
+  }
+  getFlattenedValues(): string[] {
+    return this.remoteOptions.map((value) => {
+      if (typeof value === 'string') {
+        return value
+      }
+      return value.value
+    })
+  }
+  containsAll(lattesChoices: string[] | string): boolean {
+    const lattesChoicesArray = Array.isArray(lattesChoices)
+      ? lattesChoices
+      : [lattesChoices]
+    return lattesChoicesArray.every((value) => this.includes(value))
+  }
+  private includes(searchValue: string): boolean {
+    return this.getFlattenedValues().includes(searchValue)
+  }
 }

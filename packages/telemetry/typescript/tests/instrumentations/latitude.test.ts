@@ -37,7 +37,7 @@ describe('latitude', () => {
     gatewayMock.close()
   })
 
-  // TODO(compiler): unskip and fix this test — Alex should know how to do this
+  // TODO(tracing): review this test
   it.skip(
     'succeeds when instrumenting latitude renders',
     gatewayMock.boundary(async () => {

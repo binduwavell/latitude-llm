@@ -21,8 +21,6 @@ import type {
   ProviderLog,
   ProviderLogDto,
   Providers,
-  Segment,
-  Span,
   User,
   Workspace,
 } from '../browser'
@@ -72,6 +70,7 @@ export type Events =
   | 'spanCreated'
   | 'segmentCreated'
   | 'segmentUpdated'
+  | 'actionExecuted'
 
 export type LatitudeEventGeneric<
   U extends Events,
@@ -489,7 +488,7 @@ export type SpanCreatedEvent = LatitudeEventGeneric<
   {
     workspaceId: number
     apiKeyId: number
-    span: Span
+    spanId: string
   }
 >
 
@@ -498,7 +497,7 @@ export type SegmentCreatedEvent = LatitudeEventGeneric<
   {
     workspaceId: number
     apiKeyId: number
-    segment: Segment
+    segmentId: string
   }
 >
 
@@ -507,7 +506,16 @@ export type SegmentUpdatedEvent = LatitudeEventGeneric<
   {
     workspaceId: number
     apiKeyId: number
-    segment: Segment
+    segmentId: string
+  }
+>
+
+export type ActionExecutedEvent = LatitudeEventGeneric<
+  'actionExecuted',
+  {
+    workspaceId: number
+    userEmail: string
+    actionType: string
   }
 >
 
@@ -555,6 +563,7 @@ export type LatitudeEvent =
   | SpanCreatedEvent
   | SegmentCreatedEvent
   | SegmentUpdatedEvent
+  | ActionExecutedEvent
 
 export interface IEventsHandlers {
   magicLinkTokenCreated: EventHandler<MagicLinkTokenCreated>[]
@@ -600,4 +609,5 @@ export interface IEventsHandlers {
   spanCreated: EventHandler<SpanCreatedEvent>[]
   segmentCreated: EventHandler<SegmentCreatedEvent>[]
   segmentUpdated: EventHandler<SegmentUpdatedEvent>[]
+  actionExecuted: EventHandler<ActionExecutedEvent>[]
 }

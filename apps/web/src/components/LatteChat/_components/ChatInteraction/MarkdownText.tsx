@@ -1,10 +1,10 @@
-import React, { ReactNode, useMemo } from 'react'
-import Link from 'next/link'
-import type { Components } from 'react-markdown'
-import { Markdown } from '@latitude-data/web-ui/atoms/Markdown'
 import { CodeBlock } from '@latitude-data/web-ui/atoms/CodeBlock'
 import { Icon, IconName } from '@latitude-data/web-ui/atoms/Icons'
+import { Markdown } from '@latitude-data/web-ui/atoms/Markdown'
 import { Text } from '@latitude-data/web-ui/atoms/Text'
+import Link from 'next/link'
+import React, { ReactNode, useMemo } from 'react'
+import type { Components } from 'react-markdown'
 
 function isCodeBlockInline(children: string, className?: string) {
   return className === undefined && !children.includes('\n')
@@ -34,10 +34,16 @@ function LatteLink({ children, href }: { children: ReactNode; href: string }) {
     <Link
       href={href}
       target={linkTarget(href)}
-      className='bg-accent hover:bg-accent/75 rounded-sm px-1 no-underline inline-flex items-center gap-1'
+      className='bg-latte-input hover:bg-latte-input/75 rounded-sm px-1 no-underline inline-flex items-center gap-1'
     >
-      {iconName && <Icon name={iconName} color='primary' className='w-4 h-4' />}
-      <Text.H5B color='primary'>{children}</Text.H5B>
+      {iconName && (
+        <Icon
+          name={iconName}
+          color='latteInputForeground'
+          className='w-4 h-4'
+        />
+      )}
+      <Text.H5B color='latteInputForeground'>{children}</Text.H5B>
     </Link>
   )
 }
@@ -47,20 +53,26 @@ export const MarkdownResponse = React.memo(
     const components = useMemo<Components>(
       () => ({
         h1: ({ children }) => (
-          <Text.H3 color='foregroundMuted'>{children}</Text.H3>
+          <div className='block'>
+            <Text.H3 color='latteOutputForeground'>{children}</Text.H3>
+          </div>
         ),
         h2: ({ children }) => (
-          <Text.H4B color='foregroundMuted'>{children}</Text.H4B>
+          <div className='block'>
+            <Text.H4B color='latteOutputForeground'>{children}</Text.H4B>
+          </div>
         ),
         h3: ({ children }) => (
-          <Text.H4 color='foregroundMuted'>{children}</Text.H4>
+          <div className='block'>
+            <Text.H4 color='latteOutputForeground'>{children}</Text.H4>
+          </div>
         ),
 
         p: ({ children }) => (
-          <Text.H5 color='foregroundMuted'>{children}</Text.H5>
+          <Text.H5 color='latteOutputForeground'>{children}</Text.H5>
         ),
         strong: ({ children }) => (
-          <Text.H5B color='foregroundMuted'>{children}</Text.H5B>
+          <Text.H5B color='latteOutputForeground'>{children}</Text.H5B>
         ),
 
         a: ({ children, href }) => (
@@ -76,16 +88,17 @@ export const MarkdownResponse = React.memo(
               <div
                 {...restProps}
                 ref={ref as React.LegacyRef<HTMLDivElement>}
-                className='bg-muted rounded-sm px-1 py-0.5 inline-flex flex-wrap'
+                className='bg-latte-background rounded-sm px-1 py-0.5 inline-flex flex-wrap'
               >
-                <Text.H6M color='foregroundMuted'>{content}</Text.H6M>
+                <Text.H6M color='latteInputForeground'>{content}</Text.H6M>
               </div>
             )
           }
+
           return (
             <CodeBlock
               {...props}
-              className='bg-background'
+              bgColor='bg-latte-widget'
               language={getLanguageFromCodeBlock(className)}
               textWrap
             >
@@ -96,7 +109,7 @@ export const MarkdownResponse = React.memo(
 
         li: ({ children }) => (
           <li>
-            <Text.H5 color='foregroundMuted'>{children}</Text.H5>
+            <Text.H5 color='latteOutputForeground'>{children}</Text.H5>
           </li>
         ),
         hr: () => <div className='w-full h-px bg-muted my-4' />,
@@ -105,7 +118,10 @@ export const MarkdownResponse = React.memo(
     )
 
     return (
-      <Markdown className='text-muted-foreground' components={components}>
+      <Markdown
+        className='text-latte-output-foreground'
+        components={components}
+      >
         {text}
       </Markdown>
     )

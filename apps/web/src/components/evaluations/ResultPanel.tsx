@@ -2,7 +2,7 @@
 
 import { DATASET_TABLE_PAGE_SIZE } from '$/app/(private)/datasets/_components/DatasetsTable'
 import { MetadataInfoTabs } from '$/app/(private)/projects/[projectId]/versions/[commitUuid]/documents/[documentUuid]/_components/MetadataInfoTabs'
-import { DocumentLogParameters } from '$/app/(private)/projects/[projectId]/versions/[commitUuid]/documents/[documentUuid]/logs/_components/DocumentLogs/DocumentLogInfo/Metadata'
+import { DocumentLogParameters } from '$/app/(private)/projects/[projectId]/versions/[commitUuid]/documents/[documentUuid]/(withTabs)/logs/_components/DocumentLogs/DocumentLogInfo/Metadata'
 import { useCurrentDocument } from '$/app/providers/DocumentProvider'
 import { MetadataItem } from '$/components/MetadataItem'
 import { useDatasetRole } from '$/hooks/useDatasetRoles'
@@ -178,18 +178,12 @@ function ResultPanelMetadata<
         </ClickToCopy>
       </MetadataItem>
       {result.error ? (
-        <MetadataItem
-          label='Error'
-          color='destructiveMutedForeground'
-          contentClassName='pt-2'
-          stacked
-        >
-          <Alert
-            variant='destructive'
-            showIcon={false}
-            description={result.error.message}
-          />
-        </MetadataItem>
+        <Alert
+          variant='destructive'
+          showIcon={false}
+          title='Evaluation failed'
+          description={result.error.message}
+        />
       ) : (
         <>
           <MetadataItem

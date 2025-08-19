@@ -1,21 +1,20 @@
 'use client'
 import { MouseEvent, ReactNode, useCallback, useState } from 'react'
 
-import { Button, ButtonProps } from '../Button'
-import { Icon } from '../Icons'
-import { type IconProps } from '../Icons'
-import { Text } from '../Text'
 import { cn } from '../../../lib/utils'
+import { Button, ButtonProps } from '../Button'
+import { Icon, type IconProps } from '../Icons'
+import { Text } from '../Text'
 
 import {
-  DropdownMenu as DropdownMenuRoot,
   DropdownMenuContent,
-  DropdownMenuTrigger,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuPortal,
+  DropdownMenu as DropdownMenuRoot,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
+  DropdownMenuTrigger,
   type ContentProps,
 } from './Primitives'
 
@@ -31,7 +30,10 @@ export const TriggerButton = ({
 }: TriggerButtonProps) => {
   const className = !buttonProps.indicator ? (cln ?? 'w-8 px-1') : cln
   return (
-    <DropdownMenuTrigger asChild className='flex focus:outline-none'>
+    <DropdownMenuTrigger
+      asChild
+      className='flex focus:outline-none cursor-pointer'
+    >
       <Button
         asChild
         fullWidth={false}
@@ -48,7 +50,7 @@ export const TriggerButton = ({
 
 export type MenuOption = {
   label: string
-  onClick: () => void
+  onClick?: () => void
   closeDropdown?: () => void
   onElementClick?: (e: MouseEvent) => void
   type?: 'normal' | 'destructive'
@@ -75,7 +77,7 @@ function DropdownItem({
   const onSelect = useCallback(() => {
     if (disabled) return
 
-    onClick()
+    onClick?.()
     closeDropdown?.()
   }, [disabled, onClick, closeDropdown])
   return (
@@ -85,6 +87,7 @@ function DropdownItem({
       disabled={disabled}
       className={cn('gap-2 items-center cursor-pointer', {
         'min-w-0': ellipsis,
+        'cursor-auto pointer-events-none': !onClick,
       })}
     >
       {iconProps ? <Icon {...iconProps} /> : null}
@@ -107,7 +110,7 @@ function DropdownItem({
   )
 }
 
-type RenderTriggerProps = { open: boolean }
+type RenderTriggerProps = { open: boolean; setOpen: (open: boolean) => void }
 type TriggerButtonPropsFn = (open: boolean) => TriggerButtonProps
 type Props = ContentProps & {
   triggerButtonProps?: TriggerButtonProps | TriggerButtonPropsFn
@@ -117,6 +120,7 @@ type Props = ContentProps & {
   options: MenuOption[]
   onOpenChange?: (open: boolean) => void
   controlledOpen?: boolean
+  readOnly?: boolean
 }
 export function DropdownMenu({
   triggerButtonProps,
@@ -130,9 +134,13 @@ export function DropdownMenu({
   onOpenChange,
   controlledOpen,
   width = 'normal',
+  readOnly = false,
 }: Props) {
   const [open, setOpen] = useState(false)
-  const isFn = typeof triggerButtonProps === 'function'
+  const triggerProps =
+    typeof triggerButtonProps === 'function'
+      ? triggerButtonProps(open)
+      : triggerButtonProps
   const closeDropdown = useCallback(() => {
     setOpen(false)
   }, [])
@@ -144,12 +152,15 @@ export function DropdownMenu({
       }}
       open={controlledOpen !== undefined ? controlledOpen : open}
     >
-      {triggerButtonProps ? (
+      {triggerProps ? (
         <TriggerButton
-          {...(isFn ? triggerButtonProps(open) : triggerButtonProps)}
+          {...triggerProps}
+          className={cn(triggerProps.className, {
+            'pointer-events-none': readOnly,
+          })}
         />
       ) : trigger ? (
-        trigger({ open })
+        trigger({ open, setOpen })
       ) : (
         <TriggerButton />
       )}
@@ -187,11 +198,11 @@ export function DropdownMenu({
 }
 
 export {
-  DropdownMenuRoot,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuPortal,
+  DropdownMenuRoot,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,

@@ -15,6 +15,7 @@ export function CollapsibleBox({
   expandedContent,
   expandedContentHeader,
   expandedHeight,
+  maxHeight,
   initialExpanded = false,
   onToggle,
   scrollable = true,
@@ -24,6 +25,7 @@ export function CollapsibleBox({
   paddingLeft = true,
   isExpanded: isExpandedProp,
   avoidToggleOnTitleClick = false,
+  handleIcon = true,
   handlePosition = 'right',
   className,
   headerClassName,
@@ -34,7 +36,8 @@ export function CollapsibleBox({
   collapsedContentHeader?: ReactNode
   expandedContent?: ReactNode
   expandedContentHeader?: ReactNode
-  expandedHeight?: string
+  expandedHeight?: number
+  maxHeight?: string
   initialExpanded?: boolean
   onToggle?: OnToggleFn
   isExpanded?: boolean
@@ -44,6 +47,7 @@ export function CollapsibleBox({
   paddingRight?: boolean
   paddingLeft?: boolean
   avoidToggleOnTitleClick?: boolean
+  handleIcon?: boolean
   handlePosition?: 'left' | 'right'
   className?: string
   headerClassName?: string
@@ -91,7 +95,7 @@ export function CollapsibleBox({
       >
         <div
           className={cn(
-            'min-h-14 flex flex-shrink-0 justify-between items-center py-3.5 px-4 gap-x-4',
+            'flex flex-shrink-0 justify-between items-center py-3.5 px-4 gap-x-4',
             {
               'border-b': isExpanded && headerDivider,
             },
@@ -101,7 +105,7 @@ export function CollapsibleBox({
             className='flex flex-row items-center gap-x-2'
             onClick={onTitleClick}
           >
-            {handlePosition === 'left' && (
+            {handlePosition === 'left' && handleIcon && (
               <Icon
                 className='flex-shrink-0'
                 name={isExpanded ? 'chevronUp' : 'chevronDown'}
@@ -118,7 +122,7 @@ export function CollapsibleBox({
             <div className='flex-grow min-w-0'>
               {isExpanded ? expandedContentHeader : collapsedContentHeader}
             </div>
-            {handlePosition === 'right' && (
+            {handlePosition === 'right' && handleIcon && (
               <Icon
                 className='flex-shrink-0'
                 name={isExpanded ? 'chevronUp' : 'chevronDown'}
@@ -136,22 +140,21 @@ export function CollapsibleBox({
           'overflow-y-auto custom-scrollbar scrollable-indicator': scrollable,
         })}
         style={{
-          maxHeight: isExpanded ? expandedHeight : 0,
+          height: isExpanded ? expandedHeight : 0,
+          maxHeight: maxHeight,
           opacity: isExpanded ? 1 : 0,
         }}
       >
-        {expandedContent && (
-          <div
-            className={cn({
-              'flex min-h-0': !scrollable,
-              'pl-4': paddingLeft,
-              'pr-4': paddingRight,
-              'pb-3.5': paddingBottom,
-            })}
-          >
-            {expandedContent}
-          </div>
-        )}
+        <div
+          className={cn({
+            'flex min-h-0': !scrollable,
+            'pl-4': paddingLeft,
+            'pr-4': paddingRight,
+            'pb-3.5': paddingBottom,
+          })}
+        >
+          {expandedContent}
+        </div>
       </div>
     </div>
   )

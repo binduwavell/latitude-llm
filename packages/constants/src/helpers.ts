@@ -1,5 +1,8 @@
 import type { DocumentVersion, SimplifiedDocumentVersion } from './models'
 
+export const EMAIL_REGEX =
+  /^(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*)@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/gi
+
 export function resolveRelativePath(refPath: string, from?: string): string {
   if (refPath.startsWith('/')) {
     return refPath.slice(1)
@@ -61,4 +64,28 @@ export function simplifyDocument(
     content: document.content,
     isDeleted: document.deletedAt !== null,
   }
+}
+
+export function isSafeUrl(url: unknown): url is string | URL {
+  const isUrl =
+    url instanceof URL ||
+    (typeof url === 'string' && (url.startsWith('/') || URL.canParse(url)))
+  if (!isUrl) return false
+
+  if (url.toString().startsWith('/')) return true
+  if (url.toString().startsWith('https')) return true
+  if (url.toString().startsWith('http://localhost')) return true
+
+  return false
+}
+
+export function isLatitudeUrl(url: unknown): url is string | URL {
+  if (!isSafeUrl(url)) return false
+
+  if (url.toString().startsWith('/')) return true
+  if (url.toString().startsWith('http://localhost')) return true
+  if (url.toString().startsWith('https://latitude.so')) return true
+  if (url.toString().startsWith('https://app.latitude.so')) return true
+
+  return false
 }
