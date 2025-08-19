@@ -4,7 +4,7 @@ import {
   EMAIL_TRIGGER_DOMAIN,
 } from '@latitude-data/constants'
 import { DocumentVersion } from '@latitude-data/core/browser'
-import { EmailTriggerConfiguration } from '@latitude-data/core/services/documentTriggers/helpers/schema'
+import { EmailTriggerConfiguration } from '@latitude-data/constants/documentTriggers'
 import { Text } from '@latitude-data/web-ui/atoms/Text'
 import { useCallback, useMemo } from 'react'
 import { EmailTriggerConfig } from './Config'
@@ -46,6 +46,7 @@ export function EmailTriggerSettings({
 
       if (emailTrigger) {
         update({
+          documentUuid: document.documentUuid,
           documentTrigger: emailTrigger,
           configuration: config,
         })
@@ -53,11 +54,14 @@ export function EmailTriggerSettings({
       }
 
       create({
-        triggerType: DocumentTriggerType.Email,
-        configuration: config,
+        documentUuid: document.documentUuid,
+        trigger: {
+          type: DocumentTriggerType.Email,
+          configuration: config,
+        },
       })
     },
-    [emailTrigger, create, deleteFn, update],
+    [emailTrigger, create, deleteFn, update, document.documentUuid],
   )
 
   const triggerEmailAddress = `${document.documentUuid}@${EMAIL_TRIGGER_DOMAIN}`

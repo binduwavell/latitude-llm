@@ -1,29 +1,26 @@
-import { resolveRelativePath } from '@latitude-data/constants'
-import { fromAstToBlocks } from '@latitude-data/web-ui/fromAstToBlocks'
-import { latitudePromptConfigSchema } from '@latitude-data/constants/latitudePromptSchema'
-
-import type { AstError } from '@latitude-data/constants/promptl'
 import type { AgentToolsMap } from '@latitude-data/constants'
-import type { BlockRootNode } from '@latitude-data/web-ui/fromAstToBlocks'
-
+import { resolveRelativePath } from '@latitude-data/constants'
+import { latitudePromptConfigSchema } from '@latitude-data/constants/latitudePromptSchema'
+import type { AstError } from '@latitude-data/constants/promptl'
 import {
   CompileError as PromptlCompileError,
   ConversationMetadata as PromptlConversationMetadata,
   scan,
 } from 'promptl-ai'
+import type { BlockRootNode } from '../components/BlocksEditor/Editor/state/promptlToLexical/fromAstToBlocks'
+import { fromAstToBlocks } from '../components/BlocksEditor/Editor/state/promptlToLexical/fromAstToBlocks'
 
 type CompileError = PromptlCompileError
 
-type EditorType = 'code' | 'visual'
 export type ReadMetadataWorkerProps = Parameters<typeof scan>[0] & {
   promptlVersion: number
-  editorType: EditorType
   document?: any
   documents?: any[]
   providerNames?: string[]
   integrationNames?: string[]
   agentToolsMap?: AgentToolsMap
   noOutputSchemaConfig?: { message: string }
+  origin?: 'blocksEditor' | 'latteCopilot' | string
 }
 
 function readDocument(document?: any, documents?: any[], prompt?: string) {
@@ -51,12 +48,12 @@ function readDocument(document?: any, documents?: any[], prompt?: string) {
 
 function handleMetadata({
   prompt,
-  editorType,
   metadata,
+  origin,
 }: {
   prompt: string
-  editorType: EditorType
   metadata: PromptlConversationMetadata
+  origin?: ReadMetadataWorkerProps['origin']
 }) {
   const { setConfig: _, errors: rawErrors, ...returnedMetadata } = metadata
   const errors = rawErrors.map((error: CompileError) => {
@@ -76,9 +73,8 @@ function handleMetadata({
     } satisfies AstError
   })
 
-  let rootBlock: BlockRootNode
-
-  if (metadata.ast && editorType === 'visual') {
+  let rootBlock: BlockRootNode | undefined = undefined
+  if (metadata.ast) {
     rootBlock = fromAstToBlocks({ ast: metadata.ast, prompt, errors })
   }
 
@@ -86,7 +82,8 @@ function handleMetadata({
     ...(returnedMetadata as PromptlConversationMetadata),
     errors,
     // We lie with `!` but is ok because this is used only when visual editor
-    rootBlock: rootBlock!,
+    rootBlock,
+    origin,
   }
 }
 
@@ -95,13 +92,13 @@ export type ResolvedMetadata = Awaited<ReturnType<typeof handleMetadata>>
 self.onmessage = async function (event: { data: ReadMetadataWorkerProps }) {
   const {
     prompt,
-    editorType,
     document,
     documents,
     providerNames,
     agentToolsMap,
     integrationNames,
     noOutputSchemaConfig,
+    origin,
     ...rest
   } = event.data
 
@@ -136,5 +133,5 @@ self.onmessage = async function (event: { data: ReadMetadataWorkerProps }) {
   }
   const metadata = await scan(scanParams)
 
-  self.postMessage(handleMetadata({ editorType, metadata, prompt }))
+  self.postMessage(handleMetadata({ metadata, prompt, origin }))
 }

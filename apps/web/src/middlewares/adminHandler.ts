@@ -1,5 +1,6 @@
-import { getCurrentUserOrError } from '$/services/auth/getCurrentUser'
-import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUserOrRedirect } from '$/services/auth/getCurrentUser'
+import { notFound } from 'next/navigation'
+import { NextRequest } from 'next/server'
 
 export function adminHandler(handler: any) {
   return async (
@@ -8,18 +9,16 @@ export function adminHandler(handler: any) {
   ) => {
     let user, workspace
     try {
-      const { user: uzer, workspace: workzpace } = await getCurrentUserOrError()
+      const { user: uzer, workspace: workzpace } =
+        await getCurrentUserOrRedirect()
       user = uzer
       workspace = workzpace
     } catch (error) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      return notFound()
     }
 
     if (!user.admin) {
-      return NextResponse.json(
-        { message: 'Admin access required' },
-        { status: 403 },
-      )
+      return notFound()
     }
 
     const resolvedParams = params ? await params : {}

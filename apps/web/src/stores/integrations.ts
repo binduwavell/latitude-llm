@@ -1,3 +1,5 @@
+'use client'
+
 import type { IntegrationDto } from '@latitude-data/core/browser'
 import { useToast } from '@latitude-data/web-ui/atoms/Toast'
 import { createIntegrationAction } from '$/actions/integrations/create'
@@ -9,6 +11,7 @@ import useLatitudeAction from '$/hooks/useLatitudeAction'
 import { ROUTES } from '$/services/routes'
 import useSWR, { SWRConfiguration } from 'swr'
 import { IntegrationType } from '@latitude-data/constants'
+import { useMemo } from 'react'
 
 const EMPTY_ARRAY: IntegrationDto[] = []
 
@@ -48,7 +51,12 @@ export default function useIntegrations({
     mutate,
     ...rest
   } = useSWR<IntegrationDto[]>(
-    ['integrations', includeLatitudeTools ?? false, withTools, withTriggers],
+    [
+      'integrations',
+      includeLatitudeTools ?? false,
+      withTools ?? false,
+      withTriggers ?? false,
+    ],
     fetcher,
     opts,
   )
@@ -117,20 +125,36 @@ export default function useIntegrations({
     },
   )
 
-  return {
-    data,
-    create,
-    createError,
-    isCreating,
-    destroy,
-    isDestroying,
-    scaleDown,
-    isScalingDown,
-    scaleUp,
-    isScalingUp,
-    mutate,
-    ...rest,
-  }
+  return useMemo(
+    () => ({
+      data,
+      create,
+      createError,
+      isCreating,
+      destroy,
+      isDestroying,
+      scaleDown,
+      isScalingDown,
+      scaleUp,
+      isScalingUp,
+      mutate,
+      ...rest,
+    }),
+    [
+      data,
+      create,
+      createError,
+      isCreating,
+      destroy,
+      isDestroying,
+      scaleDown,
+      isScalingDown,
+      scaleUp,
+      isScalingUp,
+      mutate,
+      rest,
+    ],
+  )
 }
 
 function deserialize(item: IntegrationDto): IntegrationDto {

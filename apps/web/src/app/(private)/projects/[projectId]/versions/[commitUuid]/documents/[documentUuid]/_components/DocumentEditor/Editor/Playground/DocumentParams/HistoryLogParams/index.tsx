@@ -23,6 +23,7 @@ import { useDebouncedCallback } from 'use-debounce'
 import { ParametersWrapper } from '../ParametersWrapper'
 import { usePaginatedDocumentLogUrl } from '$/hooks/playgrounds/usePaginatedDocumentLogUrl'
 import { ParametersPaginationNav } from '$/components/ParametersPaginationNav'
+import { useLimitedHistoryLogs } from '../../../V2Playground/hooks/useLimitedHistoryLogs'
 
 function DebouncedTextArea({
   input,
@@ -58,6 +59,7 @@ function DebouncedTextArea({
 
   return (
     <TextArea
+      name={param}
       value={localValue}
       minRows={1}
       maxRows={6}
@@ -89,6 +91,7 @@ export function HistoryLogParams({
   })
 
   const hasLogs = data.count > 0
+  const { limitedCount, limitedPosition } = useLimitedHistoryLogs(data)
 
   return (
     <div className='flex flex-col gap-y-4'>
@@ -122,8 +125,8 @@ export function HistoryLogParams({
             <ParametersPaginationNav
               disabled={data.isLoadingLog}
               label='history logs'
-              currentIndex={data.position}
-              totalCount={data.count}
+              currentIndex={limitedPosition}
+              totalCount={limitedCount}
               onPrevPage={data.onPrevPage}
               onNextPage={data.onNextPage}
             />

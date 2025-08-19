@@ -5,14 +5,14 @@ import {
 import useDocumentSuggestions from '$/stores/documentSuggestions'
 import { DocumentVersion } from '@latitude-data/core/browser'
 import { Button } from '@latitude-data/web-ui/atoms/Button'
-import {
-  ICommitContextType,
-  IProjectContextType,
-} from '@latitude-data/web-ui/providers'
 import { Popover } from '@latitude-data/web-ui/atoms/Popover'
 import { Text } from '@latitude-data/web-ui/atoms/Text'
 import { Tooltip } from '@latitude-data/web-ui/atoms/Tooltip'
 import { DiffOptions } from '@latitude-data/web-ui/molecules/DocumentTextEditor/types'
+import {
+  ICommitContextType,
+  IProjectContextType,
+} from '@latitude-data/web-ui/providers'
 import { useCallback, useEffect, useState } from 'react'
 import { SuggestionItem } from './SuggestionItem'
 
@@ -118,6 +118,7 @@ export function DocumentSuggestions({
             color: 'primary',
           }}
           className='relative'
+          containerClassName='flex-shrink-0'
         >
           <Text.H6M color='accentForeground'>
             {suggestions.length}{' '}

@@ -1,5 +1,9 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Latitude CLI
+latitude-lock.json
+**/cli/prompts/test.js
+
 # Dependencies
 node_modules
 .pnp
@@ -83,3 +87,9 @@ ONLY_FOR_COPILOT/
 
 .claude
 __testing__
+
+
+# New spans
+apps/web/ingest
+apps/workers/workspaces/*/traces
+

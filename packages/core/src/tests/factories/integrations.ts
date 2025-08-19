@@ -3,8 +3,9 @@ import { faker } from '@faker-js/faker'
 import { IntegrationDto, Workspace } from '../../browser'
 import { database } from '../../client'
 import { IntegrationConfiguration } from '../../services/integrations/helpers/schema'
-import { IntegrationProviderConfig, integrations } from '../../schema'
+import { integrations } from '../../schema'
 import { IntegrationsRepository } from '../../repositories'
+import { DatabaseError } from 'pg'
 
 export type ICreateIntegration = {
   workspace: Workspace
@@ -17,19 +18,29 @@ export async function createIntegration({
   type,
   configuration,
 }: ICreateIntegration): Promise<IntegrationDto> {
-  const res = await database
-    .insert(integrations)
-    .values({
-      workspaceId: workspace.id,
-      name,
-      type,
-      configuration: configuration as IntegrationProviderConfig,
-      authorId: workspace.creatorId ?? '',
-    })
-    .returning()
-    .then((r) => r[0]!)
+  try {
+    const res = await database
+      .insert(integrations)
+      .values({
+        workspaceId: workspace.id,
+        name,
+        type,
+        configuration:
+          configuration as IntegrationConfiguration['configuration'],
+        authorId: workspace.creatorId ?? '',
+      })
+      .returning()
+      .then((r) => r[0]!)
 
-  const integrationsRepo = new IntegrationsRepository(workspace.id, database)
-  const result = await integrationsRepo.find(res.id)
-  return result.unwrap()
+    const integrationsRepo = new IntegrationsRepository(workspace.id, database)
+
+    const result = await integrationsRepo.find(res.id)
+    return result.unwrap()
+  } catch (e) {
+    if ('cause' in (e as Error)) {
+      throw (e as DatabaseError).cause
+    } else {
+      throw e
+    }
+  }
 }

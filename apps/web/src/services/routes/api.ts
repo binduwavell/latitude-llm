@@ -6,6 +6,7 @@ type PaginationParameters = { page: number; pageSize: number }
 export const API_ROUTES = {
   workspaces: {
     current: '/api/workspaces/current',
+    available: '/api/workspaces/available',
     usage: '/api/workspaces/usage',
     onboarding: {
       root: '/api/workspaces/onboarding',
@@ -35,6 +36,8 @@ export const API_ROUTES = {
       detail: (slugName: string) => ({
         root: `/api/integrations/pipedream/${slugName}`,
       }),
+      apps: '/api/integrations/pipedream/apps',
+      connectedByApp: '/api/integrations/pipedream/connectedByApp',
     },
   },
   webhooks: {
@@ -81,6 +84,7 @@ export const API_ROUTES = {
   },
   users: {
     root: '/api/users',
+    current: '/api/users/current',
   },
   documents: {
     logs: {
@@ -103,6 +107,9 @@ export const API_ROUTES = {
         },
         stats: {
           root: `${projectRoot}/stats`,
+        },
+        triggers: {
+          root: `${projectRoot}/triggers`,
         },
         commits: {
           root: `${projectRoot}/commits`,
@@ -292,9 +299,6 @@ export const API_ROUTES = {
                   }
                 },
               },
-              triggers: {
-                root: `${documentRoot}/triggers`,
-              },
             }
           },
         },
@@ -376,6 +380,13 @@ export const API_ROUTES = {
           },
         },
       }
+    },
+  },
+  latte: {
+    debug: {
+      versions: {
+        root: `/api/latte/debug/versions`,
+      },
     },
   },
 }

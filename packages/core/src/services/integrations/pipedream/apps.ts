@@ -1,13 +1,17 @@
-import { App, BackendClient, createBackendClient } from '@pipedream/sdk/server'
-import { PromisedResult } from '../../../lib/Transaction'
+import {
+  BadRequestError,
+  UnprocessableEntityError,
+} from '@latitude-data/constants/errors'
 import { env } from '@latitude-data/env'
-import { Result } from '../../../lib/Result'
-import { UnauthorizedError } from '@latitude-data/constants/errors'
+import { App, BackendClient, createBackendClient } from '@pipedream/sdk/server'
 import {
   AppDto,
   PipedreamComponent,
   PipedreamComponentType,
 } from '../../../constants'
+import { Result } from '../../../lib/Result'
+import { PromisedResult } from '../../../lib/Transaction'
+import { fetchTriggerCounts } from './fetchTriggerCounts'
 
 const LIST_APPS_LIMIT = 64
 
@@ -26,7 +30,7 @@ export function getPipedreamEnvironment() {
     !PIPEDREAM_PROJECT_ID
   ) {
     return Result.error(
-      new UnauthorizedError(
+      new UnprocessableEntityError(
         'Pipedream credentials are not set. Please set PIPEDREAM_CLIENT_ID, PIPEDREAM_CLIENT_SECRET and PIPEDREAM_PROJECT_ID in your environment variables.',
       ),
     )
@@ -42,14 +46,80 @@ export function getPipedreamEnvironment() {
   })
 }
 
+export function buildPipedreamClient() {
+  const pipedreamEnv = getPipedreamEnvironment()
+
+  if (pipedreamEnv.error) return pipedreamEnv
+
+  return Result.ok(createBackendClient(pipedreamEnv.value))
+}
+
 export async function listApps({
   query,
   cursor,
-}: { query?: string; cursor?: string } = {}): PromisedResult<{
+  withTriggers: hasTriggers = false,
+}: {
+  query?: string
+  cursor?: string
+  withTriggers?: boolean
+} = {}): PromisedResult<{
   apps: App[]
   totalCount: number
   cursor: string
+  withTriggers?: boolean
 }> {
+  const pipedreamResult = buildPipedreamClient()
+
+  if (pipedreamResult.error) {
+    return Result.error(pipedreamResult.error)
+  }
+
+  const pipedream = pipedreamResult.value
+
+  try {
+    const apps = await pipedream.getApps({
+      q: query,
+      limit: LIST_APPS_LIMIT,
+      after: cursor,
+      hasTriggers,
+    })
+    let appsList: App[] = apps.data
+
+    if (hasTriggers) {
+      const appsListResult = await fetchTriggerCounts({
+        type: 'pipedreamApps',
+        apps: appsList,
+        pipedream,
+      })
+      appsList = appsListResult.unwrap()
+    }
+    return Result.ok({
+      apps: appsList,
+      totalCount: apps.page_info.total_count,
+      cursor: apps.page_info.end_cursor,
+    })
+  } catch (error) {
+    return Result.error(error as Error)
+  }
+}
+
+export async function searchComponents({
+  app,
+  query,
+  componentType,
+}: {
+  app?: string
+  query?: string
+  componentType?: 'trigger' | 'tool'
+}): PromisedResult<PipedreamComponent[]> {
+  if (!app && !query) {
+    return Result.error(
+      new BadRequestError(
+        'Either app or query must be provided to search components.',
+      ),
+    )
+  }
+
   const pipedreamEnv = getPipedreamEnvironment()
   if (!pipedreamEnv.ok) {
     return Result.error(pipedreamEnv.error!)
@@ -58,17 +128,19 @@ export async function listApps({
   const pipedream = createBackendClient(pipedreamEnv.unwrap())
 
   try {
-    const apps = await pipedream.getApps({
+    const limit = !app ? LIST_APPS_LIMIT : 50 // Show up to 50 components if an app is specified
+    const response = await pipedream.getComponents({
+      app,
       q: query,
-      limit: LIST_APPS_LIMIT,
-      after: cursor,
-      hasComponents: true,
+      limit,
+      componentType: componentType
+        ? componentType === 'trigger'
+          ? 'trigger'
+          : 'action'
+        : undefined,
     })
-    return Result.ok({
-      apps: apps.data,
-      totalCount: apps.page_info.total_count,
-      cursor: apps.page_info.end_cursor,
-    })
+
+    return Result.ok(response.data as PipedreamComponent[])
   } catch (error) {
     return Result.error(error as Error)
   }

@@ -1,12 +1,12 @@
 import { cache } from 'react'
 
+import { getDataFromSession } from '$/data-access'
 import { Workspace } from '@latitude-data/core/browser'
-import {
-  getCurrentUserFromDB,
-  unsafelyGetCurrentUserFromDb,
-} from '$/data-access'
 import { Session } from 'lucia'
 
+import { notFound, redirect } from 'next/navigation'
+import { ROUTES } from '../routes'
+import { getCurrentUrl } from './getCurrentUrl'
 import { getSession } from './getSession'
 
 export type SessionData = {
@@ -19,38 +19,52 @@ export type SessionData = {
   impersonating?: true
 }
 
-/**
- * This method is used in places where session has been already checked
- * An example of it are inner `app/(private)` routes. Session was check in main
- * layout. We don't want to throw a not found error if session is not present
- */
-export const getCurrentUser = cache(async () => {
-  const sessionData = await getSession()
-  const { user, workspace, subscriptionPlan } =
-    await unsafelyGetCurrentUserFromDb({
-      userId: sessionData?.user?.id,
-    })
-
-  return {
-    session: sessionData.session!,
-    user: user!,
-    workspace: workspace!,
-    subscriptionPlan,
+function redirectToLogin(currentUrl?: string) {
+  if (!currentUrl) {
+    return redirect(ROUTES.auth.login)
   }
-})
+
+  // Note: this should never happen because getCurrentUserOrRedirect should not be used in the login page
+  if (currentUrl.includes(ROUTES.auth.login)) {
+    return notFound()
+  }
+
+  return redirect(
+    `${ROUTES.auth.login}?returnTo=${encodeURIComponent(currentUrl)}`,
+  )
+}
 
 /**
- * This method is used in places where session has to be check
- * If something is not present it will throw an error
+ * Gets the current authenticated user and workspace data, or redirects to login if not authenticated.
+ *
+ * This function is cached using React's cache() to avoid repeated database calls during the same request.
+ * It performs the following checks:
+ * 1. Verifies that a valid session exists
+ * 2. Retrieves user and workspace data from the session
+ * 3. Redirects to login page if any authentication data is missing
+ *
+ * @returns Promise<SessionData> - The authenticated user's session data including user, workspace, and subscription plan
+ * @throws {never} - This function never throws, it redirects instead
  */
-export const getCurrentUserOrError = cache(async () => {
+export const getCurrentUserOrRedirect = cache(async () => {
+  const currentUrl = await getCurrentUrl()
+
   const sessionData = await getSession()
-  const result = await getCurrentUserFromDB({ userId: sessionData?.user?.id })
-  const { user, workspace } = result.unwrap()
+  if (!sessionData?.session) {
+    return redirectToLogin(currentUrl)
+  }
+
+  const { user, workspace, subscriptionPlan } = await getDataFromSession(
+    sessionData.session,
+  )
+  if (!user || !workspace) {
+    return redirectToLogin(currentUrl)
+  }
 
   return {
     session: sessionData.session!,
     user,
     workspace,
+    subscriptionPlan,
   }
 })

@@ -1,19 +1,20 @@
 import { requestSuggestionAction } from '$/actions/copilot/requestSuggestion'
 import { publishEventAction } from '$/actions/events/publishEventAction'
 import useLatitudeAction from '$/hooks/useLatitudeAction'
+import type { AstError } from '@latitude-data/constants/promptl'
 import { DocumentVersion } from '@latitude-data/core/browser'
 import { ReactStateDispatch } from '@latitude-data/web-ui/commonTypes'
 import { DocumentTextEditor } from '@latitude-data/web-ui/molecules/DocumentTextEditor'
+import type { DiffOptions } from '@latitude-data/web-ui/molecules/DocumentTextEditor/types'
 import { TextEditorPlaceholder } from '@latitude-data/web-ui/molecules/TextEditorPlaceholder'
 import {
   ICommitContextType,
   IProjectContextType,
 } from '@latitude-data/web-ui/providers'
-import type { DiffOptions } from '@latitude-data/web-ui/molecules/DocumentTextEditor/types'
-import type { AstError } from '@latitude-data/constants/promptl'
 import { memo, Suspense, useCallback } from 'react'
 import { DocumentRefinement } from '../DocumentRefinement'
 import { DocumentSuggestions } from '../DocumentSuggestions'
+import { EditorSettings } from '../EditorSettings'
 
 export const PlaygroundTextEditor = memo(
   ({
@@ -27,6 +28,7 @@ export const PlaygroundTextEditor = memo(
     value,
     defaultValue,
     copilotEnabled,
+    refinementEnabled,
     isSaved,
     readOnlyMessage,
     highlightedCursorIndex,
@@ -38,6 +40,7 @@ export const PlaygroundTextEditor = memo(
     setDiff: ReactStateDispatch<DiffOptions | undefined>
     diff: DiffOptions | undefined
     copilotEnabled: boolean
+    refinementEnabled: boolean
     value: string
     defaultValue?: string
     isSaved: boolean
@@ -123,8 +126,9 @@ export const PlaygroundTextEditor = memo(
                 document={document}
                 setDiff={setDiff}
                 setPrompt={onChange}
-                refinementEnabled={copilotEnabled}
+                refinementEnabled={refinementEnabled}
               />
+              <EditorSettings copilotEnabled={copilotEnabled} />
             </>
           }
           copilot={

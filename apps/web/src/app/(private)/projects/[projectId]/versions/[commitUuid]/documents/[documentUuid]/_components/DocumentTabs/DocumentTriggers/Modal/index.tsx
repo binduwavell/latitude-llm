@@ -14,7 +14,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react'
 import useDocumentTriggers from '$/stores/documentTriggers'
 import { TriggerTypeSelector } from './TriggerTypeSelector'
 import { IntegrationTriggerConfig } from './IntegrationTriggerConfig'
-import { IntegrationTriggerConfiguration } from '@latitude-data/core/services/documentTriggers/helpers/schema'
+import { IntegrationTriggerConfiguration } from '@latitude-data/constants/documentTriggers'
 import { usePipedreamApp } from '$/stores/pipedreamApp'
 import { ConfigurableProps, ConfiguredProps } from '@pipedream/sdk/browser'
 
@@ -126,6 +126,7 @@ export function TriggerConfigModal({
 
       if (trigger) {
         update({
+          documentUuid: document.documentUuid,
           documentTrigger: trigger,
           configuration: {
             integrationId: integration.id,
@@ -139,12 +140,15 @@ export function TriggerConfigModal({
       }
 
       create({
-        triggerType: DocumentTriggerType.Integration,
-        configuration: {
-          integrationId: integration.id,
-          componentId: component.key,
-          properties: configuredProps,
-          payloadParameters,
+        documentUuid: document.documentUuid,
+        trigger: {
+          type: DocumentTriggerType.Integration,
+          configuration: {
+            integrationId: integration.id,
+            componentId: component.key,
+            properties: configuredProps,
+            payloadParameters,
+          },
         },
       })
     },
@@ -158,6 +162,7 @@ export function TriggerConfigModal({
       component,
       isCreating,
       isUpdating,
+      document.documentUuid,
     ],
   )
 
@@ -205,6 +210,7 @@ export function TriggerConfigModal({
           {integration && component && (
             <IntegrationTriggerConfig
               key={component.key}
+              document={document}
               integration={integration}
               component={component}
               configuredProps={configuredProps}

@@ -1,11 +1,10 @@
 'use client'
 
+import { User } from '@latitude-data/core/browser'
 import { createContext, ReactNode, useContext } from 'react'
 
-import { SessionUser } from '../SessionProvider'
-
 interface ISessionContext {
-  currentUser: SessionUser | undefined
+  currentUser: User | undefined | null
 }
 
 const MaybeSessionContext = createContext<ISessionContext>(
@@ -27,10 +26,10 @@ const MaybeSessionProvider = ({
 
 const useMaybeSession = () => {
   const context = useContext(MaybeSessionContext)
-
   if (!context) {
     throw new Error('useMaybeSession must be used within a SessionProvider')
   }
+
   return context
 }
 

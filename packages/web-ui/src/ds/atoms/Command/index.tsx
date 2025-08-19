@@ -1,10 +1,11 @@
 'use client'
 
-import * as React from 'react'
 import { Dialog, DialogContent, type DialogProps } from '@radix-ui/react-dialog'
 import { Command as CommandPrimitive } from 'cmdk'
-import { Search } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '../../../lib/utils'
+import { Icon, IconName } from '../Icons'
+
 type CommandProps = React.ComponentPropsWithoutRef<typeof CommandPrimitive> & {
   unstyled?: boolean
 }
@@ -37,21 +38,23 @@ const CommandDialog = ({ children, ...props }: DialogProps) => {
 type CommandInputProps = React.ComponentPropsWithoutRef<
   typeof CommandPrimitive.Input
 > & {
-  showSearchIcon?: boolean
+  searchIcon?: IconName | null
 }
 const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
   CommandInputProps
->(({ className, showSearchIcon = true, ...props }, ref) => (
-  <div className='flex items-center border-b px-3' cmdk-input-wrapper=''>
-    {showSearchIcon ? (
-      <Search className='mr-2 h-4 w-4 shrink-0 opacity-50' />
-    ) : null}
-
+>(({ className, searchIcon = 'search', ...props }, ref) => (
+  <div
+    className='flex items-center border-b px-1 gap-x-1'
+    cmdk-input-wrapper=''
+  >
+    {!!searchIcon && (
+      <Icon name={searchIcon} className='h-4 w-4 shrink-0 opacity-50' />
+    )}
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        'flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
+        'flex w-full rounded-md bg-transparent h-8 py-1 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
       {...props}
@@ -184,11 +187,11 @@ CommandShortcut.displayName = 'CommandShortcut'
 export {
   Command,
   CommandDialog,
-  CommandInput,
-  CommandList,
   CommandEmpty,
   CommandGroup,
+  CommandInput,
   CommandItem,
-  CommandShortcut,
+  CommandList,
   CommandSeparator,
+  CommandShortcut,
 }

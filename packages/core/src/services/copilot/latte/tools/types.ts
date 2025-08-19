@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { Workspace } from '../../../../browser'
+import { User, Workspace } from '../../../../browser'
 import { PromisedResult } from '../../../../lib/Transaction'
 import { BadRequestError } from '@latitude-data/constants/errors'
 import { Result } from '../../../../lib/Result'
@@ -7,9 +7,10 @@ import { TelemetryContext } from '../../../../telemetry'
 import { ToolExecutionOptions } from 'ai'
 import { LatteTool } from '@latitude-data/constants/latte'
 
-type LatteToolContext = {
+export type LatteToolContext = {
   context: TelemetryContext
   workspace: Workspace
+  user: User
   threadUuid: string
   toolName: LatteTool
   toolCall: ToolExecutionOptions
