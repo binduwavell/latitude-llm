@@ -13,7 +13,7 @@ import { zIndex } from '../../tokens/zIndex'
 
 export type PopoverContentProps = RadixPopover.PopoverContentProps & {
   inPortal?: boolean
-  size?: 'small' | 'medium' | 'large'
+  size?: 'small' | 'medium' | 'large' | 'auto'
   scrollable?: boolean
   maxHeight?: 'normal' | 'none'
   width?: number
@@ -46,6 +46,7 @@ const PopoverContent = forwardRef<HTMLDivElement, PopoverContentProps>(
           'max-w-96 p-4': size === 'medium',
           'max-w-xl p-4': size === 'large',
           'max-h-96': maxHeight === 'normal',
+          'w-[var(--radix-popover-trigger-width)]': size === 'auto',
         },
       ),
       style: {

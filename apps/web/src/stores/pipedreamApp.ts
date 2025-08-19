@@ -1,3 +1,5 @@
+'use client'
+
 import { ROUTES } from '$/services/routes'
 import useSWR from 'swr'
 import useFetcher from '../hooks/useFetcher'
@@ -18,6 +20,7 @@ export function usePipedreamApp(slugName: string | undefined) {
         if (!response.ok) {
           throw new Error(response.errorMessage)
         }
+
         return response.data
       },
     },

@@ -9,7 +9,7 @@ import {
 import { BadRequestError } from '@latitude-data/constants/errors'
 import { env } from '@latitude-data/env'
 import { createSdk } from '$/app/(private)/_lib/createSdk'
-import { getCurrentUserOrError } from '$/services/auth/getCurrentUser'
+import { getCurrentUserOrRedirect } from '$/services/auth/getCurrentUser'
 import { authProcedure } from '$/actions/procedures'
 import { createDatasetFromJson } from '@latitude-data/core/services/datasets/createFromJson'
 
@@ -30,16 +30,16 @@ export const generateDatasetAction = authProcedure
     if (!env.COPILOT_PROJECT_ID) {
       throw new BadRequestError('COPILOT_PROJECT_ID is not set')
     }
-    if (!env.COPILOT_DATASET_GENERATOR_PROMPT_PATH) {
+    if (!env.COPILOT_PROMPT_DATASET_GENERATOR_PATH) {
       throw new BadRequestError(
-        'COPILOT_DATASET_GENERATOR_PROMPT_PATH is not set',
+        'COPILOT_PROMPT_DATASET_GENERATOR_PATH is not set',
       )
     }
     if (!env.COPILOT_WORKSPACE_API_KEY) {
       throw new BadRequestError('COPILOT_WORKSPACE_API_KEY is not set')
     }
 
-    const { user, workspace } = await getCurrentUserOrError()
+    const { user, workspace } = await getCurrentUserOrRedirect()
     const sdk = await createSdk({
       workspace,
       apiKey: env.COPILOT_WORKSPACE_API_KEY,
@@ -48,7 +48,7 @@ export const generateDatasetAction = authProcedure
     }).then((r) => r.unwrap())
 
     const sdkResponse = await sdk.prompts.run(
-      env.COPILOT_DATASET_GENERATOR_PROMPT_PATH,
+      env.COPILOT_PROMPT_DATASET_GENERATOR_PATH,
       {
         stream: false,
         parameters: {

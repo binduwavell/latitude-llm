@@ -18,9 +18,13 @@ import {
   getHeadCommitCached,
 } from '$/app/(private)/_data-access'
 import { ProjectPageParams } from '$/app/(private)/projects/[projectId]/page'
-import { getCurrentUser, SessionData } from '$/services/auth/getCurrentUser'
+import {
+  SessionData,
+  getCurrentUserOrRedirect,
+} from '$/services/auth/getCurrentUser'
 import { ROUTES } from '$/services/routes'
 import { notFound, redirect } from 'next/navigation'
+import { LatteRealtimeUpdatesProvider } from './providers/LatteRealtimeUpdatesProvider'
 
 export type CommitPageParams = {
   children: ReactNode
@@ -37,7 +41,7 @@ export default async function CommitLayout({
   let isHead = false
   const { projectId, commitUuid } = await params
   try {
-    session = await getCurrentUser()
+    session = await getCurrentUserOrRedirect()
     if (!session.workspace) return redirect(ROUTES.root)
 
     const workspace = session.workspace
@@ -69,10 +73,11 @@ export default async function CommitLayout({
 
     throw error
   }
+
   return (
     <ProjectProvider project={project}>
       <CommitProvider commit={commit} isHead={isHead}>
-        {children}
+        <LatteRealtimeUpdatesProvider>{children}</LatteRealtimeUpdatesProvider>
       </CommitProvider>
     </ProjectProvider>
   )

@@ -1,33 +1,30 @@
-import { memo, useState, Suspense, useCallback, useEffect, useRef } from 'react'
-import { stringify as stringifyObjectToYaml } from 'yaml'
-import Link from 'next/link'
-import { AstError } from '@latitude-data/constants/promptl'
-import { useToast } from '@latitude-data/web-ui/atoms/Toast'
-import { scan, Config } from 'promptl-ai'
-import { TextEditorPlaceholder } from '@latitude-data/web-ui/molecules/TextEditorPlaceholder'
-import { Text } from '@latitude-data/web-ui/atoms/Text'
-import { cn } from '@latitude-data/web-ui/utils'
 import {
   type BlockRootNode,
   BlocksEditor,
+  BlocksEditorPlaceholder,
   IncludedPrompt,
-} from '@latitude-data/web-ui/molecules/BlocksEditor'
+} from '$/components/BlocksEditor'
+import { useDevMode } from '$/hooks/useDevMode'
+import { updateContentFn } from '$/hooks/useDocumentValueContext'
+import { useEvents } from '$/lib/events'
+import useDocumentVersions from '$/stores/documentVersions'
+import { type DocumentVersion } from '@latitude-data/core/browser'
+import { useToast } from '@latitude-data/web-ui/atoms/Toast'
 import {
   ICommitContextType,
   IProjectContextType,
 } from '@latitude-data/web-ui/providers'
-import { type DocumentVersion } from '@latitude-data/core/browser'
+import { Config, scan } from 'promptl-ai'
+import { memo, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { stringify as stringifyObjectToYaml } from 'yaml'
 import { useIncludabledPrompts } from './useIncludabledPrompts'
-import useDocumentVersions from '$/stores/documentVersions'
-import { ReactStateDispatch } from '@latitude-data/web-ui/commonTypes'
 
 export const PlaygroundBlocksEditor = memo(
   ({
     project,
     commit,
     document,
-    rootBlock: defaultRootBlock,
-    onToggleBlocksEditor,
+    defaultValue,
     readOnlyMessage,
     onChange,
     config,
@@ -35,16 +32,16 @@ export const PlaygroundBlocksEditor = memo(
     project: IProjectContextType['project']
     commit: ICommitContextType['commit']
     document: DocumentVersion
-    compileErrors: AstError[] | undefined
-    rootBlock?: BlockRootNode
+    defaultValue?: BlockRootNode
     config?: Config
-    value: string
-    isSaved: boolean
     readOnlyMessage?: string
-    onToggleBlocksEditor: ReactStateDispatch<boolean>
-    onChange: (value: string) => void
+    onChange: updateContentFn
   }) => {
     const { toast } = useToast()
+    const { setDevMode } = useDevMode()
+    const toggleDevEditor = useCallback(() => {
+      setDevMode(true)
+    }, [setDevMode])
     const { data: documents } = useDocumentVersions({
       commitUuid: commit?.uuid,
       projectId: project?.id,
@@ -55,18 +52,14 @@ export const PlaygroundBlocksEditor = memo(
       document,
       documents,
     })
-
     const onRequestPromptMetadata = useCallback(
       async ({ id }: IncludedPrompt) => {
         const prompt = documents.find((doc) => doc.id === id)
+        // TODO: call web worker instead, we implemented web workers for a reason!
         return await scan({ prompt: prompt!.content })
       },
       [documents],
     )
-    const onToogleDevEditor = useCallback(() => {
-      onToggleBlocksEditor(true)
-    }, [onToggleBlocksEditor])
-
     const onError = useCallback(
       (error: Error) => {
         toast({
@@ -77,66 +70,64 @@ export const PlaygroundBlocksEditor = memo(
       },
       [toast],
     )
-
-    const isMounted = useRef(false)
-    const [initialValue, setInitialValue] = useState<BlockRootNode | undefined>(
-      defaultRootBlock,
-    )
-
-    useEffect(() => {
-      if (isMounted.current) return
-      if (!defaultRootBlock) return
-
-      setInitialValue(defaultRootBlock)
-      isMounted.current = true
-    }, [defaultRootBlock])
-
-    /*
-     * We don't touch Promptl config on Blocks editor atm
-     * So we restore the latest config from the document when a change
-     * happens
-     */
     const onChangePrompt = useCallback(
       (value: string) => {
-        if (!config) {
-          onChange(value)
+        if (commit.mergedAt) return
+        if (config) {
+          const frontMatter = stringifyObjectToYaml(config).trim()
+          value = `---\n${frontMatter}\n---\n\n${value}\n`
         }
 
-        const frontMatter = stringifyObjectToYaml(config)
-        onChange(`---\n${frontMatter}\n---\n${value}`)
+        onChange(value, { origin: 'blocksEditor' })
       },
-      [config, onChange],
+      [config, onChange, commit],
     )
 
-    // FIXME: How to refresh the Lexical editor when Promptl errors are introduced or fixed
-    // The thing is that Lexical manage his own state and we can not be passing new state whenever
-    // we save it in the DB because it will be raise conditions and the state will do weird things.
-    // But the problem with this approach of never updating the `initialValue`
+    // Note: Wait for, hopefully, the correct metadata to be set
+    // this follows the same pattern as the provider model selector
+    const [isInitialized, setInitialized] = useState(false)
+
+    useEvents({
+      onPromptMetadataChanged: ({ promptLoaded, metadata }) => {
+        if (!promptLoaded || !metadata) return
+        if (isInitialized) return
+        setInitialized(true)
+      },
+    })
+
+    // Note: Avoid setting the initial value more than once
+    const once = useRef(false)
+    const [initialValue, setInitialValue] = useState<BlockRootNode>()
+
+    useEffect(() => {
+      if (once.current) return
+      if (!isInitialized) return
+      if (!defaultValue) return
+      once.current = true
+      setInitialValue(defaultValue)
+    }, [isInitialized, defaultValue])
+
+    if (!isInitialized || !initialValue) {
+      return <BlocksEditorPlaceholder />
+    }
+
     return (
-      <Suspense fallback={<TextEditorPlaceholder />}>
-        {initialValue ? (
-          <BlocksEditor
-            initialValue={initialValue}
-            currentDocument={document}
-            prompts={prompts}
-            onError={onError}
-            Link={Link}
-            onRequestPromptMetadata={onRequestPromptMetadata}
-            onToggleDevEditor={onToogleDevEditor}
-            onChange={onChangePrompt}
-            readOnlyMessage={readOnlyMessage}
-            placeholder='Type your instructions here, use / for commands'
-          />
-        ) : (
-          <div
-            className={cn('flex items-center justify-center h-full', {
-              'border border-border bg-backgroundCode rounded-md px-3':
-                !!readOnlyMessage,
-            })}
-          >
-            <Text.H6 color='foregroundMuted'>Loading prompt....</Text.H6>
-          </div>
-        )}
+      <Suspense fallback={<BlocksEditorPlaceholder />}>
+        <BlocksEditor
+          initialValue={initialValue}
+          currentDocument={document}
+          project={project}
+          commit={commit}
+          document={document}
+          prompts={prompts}
+          onError={onError}
+          onRequestPromptMetadata={onRequestPromptMetadata}
+          onToggleDevEditor={toggleDevEditor}
+          onChange={onChangePrompt}
+          readOnlyMessage={readOnlyMessage}
+          placeholder='Type your instructions here, use / for commands'
+          autoFocus
+        />
       </Suspense>
     )
   },

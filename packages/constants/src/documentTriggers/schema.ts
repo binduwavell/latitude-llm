@@ -30,7 +30,7 @@ export const integrationTriggerConfigurationSchema = z.object({
   triggerId: z.string(),
 })
 
-const insertIntegrationTriggerConfigurationSchema =
+export const insertIntegrationTriggerConfigurationSchema =
   integrationTriggerConfigurationSchema.omit({
     triggerId: true,
   })
@@ -70,18 +70,18 @@ export const documentTriggerConfigurationSchema = z.discriminatedUnion(
 )
 
 export const insertDocumentTriggerConfigurationSchema = z.discriminatedUnion(
-  'triggerType',
+  'type',
   [
     z.object({
-      triggerType: z.literal(DocumentTriggerType.Email),
+      type: z.literal(DocumentTriggerType.Email),
       configuration: emailTriggerConfigurationSchema,
     }),
     z.object({
-      triggerType: z.literal(DocumentTriggerType.Scheduled),
+      type: z.literal(DocumentTriggerType.Scheduled),
       configuration: insertScheduledTriggerConfigurationSchema,
     }),
     z.object({
-      triggerType: z.literal(DocumentTriggerType.Integration),
+      type: z.literal(DocumentTriggerType.Integration),
       configuration: insertIntegrationTriggerConfigurationSchema,
     }),
   ],

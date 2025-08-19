@@ -4,10 +4,8 @@ import { ButtonHTMLAttributes, forwardRef, ReactNode, useMemo } from 'react'
 
 import { cn } from '../../../lib/utils'
 import { font } from '../../tokens'
-import { DotIndicator } from '../DotIndicator'
-import { DotIndicatorProps } from '../DotIndicator'
-import { Icon } from '../Icons'
-import { IconProps } from '../Icons'
+import { DotIndicator, DotIndicatorProps } from '../DotIndicator'
+import { Icon, IconProps } from '../Icons'
 
 const buttonContainerVariants = cva(
   cn(
@@ -29,7 +27,7 @@ const buttonContainerVariants = cva(
         linkOutline: 'shadow-none underline-offset-4 hover:underline',
         linkDestructive: 'shadow-none underline-offset-4 hover:underline',
         shiny: '',
-        latte: 'bg-latte hover:bg-latte/90 border-latte-border',
+        latte: 'bg-latte-border hover:bg-latte-border/90 border-latte-border',
       },
       fanciness: {
         default: 'bg-transparent hover:bg-transparent',
@@ -42,6 +40,10 @@ const buttonContainerVariants = cva(
         variant: 'outline',
         fanciness: 'fancy',
         className: 'shadow-[inset_0px_0px_0px_1px_hsl(var(--input))]',
+      },
+      {
+        variant: 'latte',
+        className: 'shadow-[inset_0px_0px_0px_1px_rgba(0,0,0,0.1)]',
       },
     ],
     defaultVariants: {
@@ -63,7 +65,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground group-hover:bg-primary/90 disabled:cursor-default',
+          'border border-transparent bg-primary text-primary-foreground group-hover:bg-primary/90 disabled:cursor-default',
         nope: 'bg-transparent text-primary-foreground group-hover:bg-transparent',
         destructive:
           'bg-destructive text-destructive-foreground group-hover:bg-destructive/90',
@@ -119,6 +121,10 @@ const buttonVariants = cva(
         fanciness: 'fancy',
         className: 'py-0.5',
       },
+      {
+        variant: 'latte',
+        className: 'shadow-[inset_0px_0px_0px_1px_rgba(0,0,0,0.2)]',
+      },
     ],
     defaultVariants: {
       variant: 'default',
@@ -139,6 +145,7 @@ export type ButtonStylesProps = VariantProps<typeof buttonVariants> & {
   fullWidth?: boolean
   isLoading?: boolean
   ellipsis?: boolean
+  roundy?: boolean
 }
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
   ButtonStylesProps & {
@@ -146,14 +153,17 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
     iconProps?: ButtonIconProps
     asChild?: boolean
     fancy?: boolean
+    roundy?: boolean
     indicator?: DotIndicatorProps
     childrenOnlyText?: boolean
+    userSelect?: boolean
   }
 
 export function useButtonStyles({
   variant,
   size,
   fanciness,
+  roundy,
   fullWidth,
   containerClassName,
   className,
@@ -170,9 +180,10 @@ export function useButtonStyles({
         containerClassName,
         {
           'w-full': fullWidth,
-          'opacity-50': lookDisabled,
+          'opacity-50 cursor-not-allowed': lookDisabled,
           'overflow-hidden': ellipsis,
           'animate-pulse': isLoading,
+          '!rounded-[0.55rem]': roundy,
         },
       ),
       buttonClass: cn(
@@ -181,6 +192,8 @@ export function useButtonStyles({
         {
           'overflow-hidden': ellipsis,
           'animate-pulse': isLoading,
+          'cursor-not-allowed': lookDisabled,
+          '!rounded-[0.55rem]': roundy,
         },
       ),
       innerButtonClass: cn(
@@ -190,6 +203,8 @@ export function useButtonStyles({
           'w-full justify-center': fullWidth,
           'overflow-hidden flex-grow min-w-0': ellipsis,
           'animate-pulse': isLoading,
+          'cursor-not-allowed': lookDisabled,
+          '!rounded-[0.55rem]': roundy,
         },
       ),
     }
@@ -197,6 +212,7 @@ export function useButtonStyles({
     variant,
     size,
     fanciness,
+    roundy,
     containerClassName,
     className,
     innerClassName,
@@ -215,6 +231,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
     variant,
     size,
     fancy,
+    roundy,
     iconProps,
     fullWidth = false,
     asChild = false,
@@ -225,6 +242,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
     lookDisabled,
     ellipsis,
     indicator,
+    userSelect = true,
     ...props
   },
   ref,
@@ -241,6 +259,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
     variant,
     size,
     fanciness,
+    roundy,
     fullWidth,
     containerClassName,
     className,
@@ -284,6 +303,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
                     !childrenOnlyText && ellipsis,
                   truncate: childrenOnlyText && ellipsis,
                   'justify-center': fullWidth || !iconProps,
+                  'select-none': !userSelect,
                 })}
               >
                 {children}

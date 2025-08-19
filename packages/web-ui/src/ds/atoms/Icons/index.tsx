@@ -59,6 +59,7 @@ import {
   FolderClosed,
   FolderOpen,
   FolderPlus,
+  Forward,
   GitCompareArrows,
   Github,
   Gitlab,
@@ -81,6 +82,7 @@ import {
   Mail,
   MapPin,
   Maximize2,
+  MessageCircleIcon,
   Minimize2,
   MinusIcon,
   MonitorIcon,
@@ -213,6 +215,7 @@ const Icons = {
   brave: Brave,
   browserbase: Browserbase,
   calendar: CalendarIcon,
+  chat: MessageCircleIcon,
   check: CheckCircle2,
   checkClean: CheckIcon,
   chevronDown: ChevronDown,
@@ -361,6 +364,7 @@ const Icons = {
   chartNoAxesGantt: ChartNoAxesGantt,
   rectangleHorizontal: RectangleHorizontal,
   expand: Expand,
+  forward: Forward,
 }
 
 export type IconName = keyof typeof Icons

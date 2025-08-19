@@ -102,9 +102,11 @@ describe('createDocumentTrigger', () => {
     const result = await createDocumentTrigger({
       workspace,
       document,
-      project,
-      triggerType: DocumentTriggerType.Email,
-      configuration: emailConfiguration,
+      projectId: project.id,
+      trigger: {
+        type: DocumentTriggerType.Email,
+        configuration: emailConfiguration,
+      },
     })
 
     // Assert
@@ -164,9 +166,11 @@ describe('createDocumentTrigger', () => {
     const result = await createDocumentTrigger({
       workspace,
       document,
-      project,
-      triggerType: DocumentTriggerType.Scheduled,
-      configuration: scheduledConfiguration,
+      projectId: project.id,
+      trigger: {
+        type: DocumentTriggerType.Scheduled,
+        configuration: scheduledConfiguration,
+      },
     })
 
     // Assert
@@ -211,9 +215,11 @@ describe('createDocumentTrigger', () => {
     const result = await createDocumentTrigger({
       workspace,
       document,
-      project,
-      triggerType: DocumentTriggerType.Email,
-      configuration: emailConfiguration,
+      projectId: project.id,
+      trigger: {
+        type: DocumentTriggerType.Email,
+        configuration: emailConfiguration,
+      },
     })
 
     // Assert

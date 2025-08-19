@@ -13,7 +13,10 @@ import {
 import { getPipedreamEnvironment } from './apps'
 import { Result } from '../../../lib/Result'
 import { PromisedResult } from '../../../lib/Transaction'
-import { fillConfiguredProps, isIntegrationConfigured } from './components'
+import {
+  fillConfiguredProps,
+  isIntegrationConfigured,
+} from './components/fillConfiguredProps'
 import { DocumentTriggerType, IntegrationType } from '@latitude-data/constants'
 import { database } from '../../../client'
 import { IntegrationsRepository } from '../../../repositories'
@@ -63,10 +66,18 @@ export async function deployPipedreamTrigger({
   const configuredProps = configuredPropsResult.unwrap()
 
   try {
+    // Need the dynamic props id for some components to work correctly (i.e. Github new branch trigger)
+    const reload = await pipedream.reloadComponentProps({
+      externalUserId: integration.configuration.externalUserId,
+      componentId: componentId,
+      configuredProps: configuredPropsResult.unwrap(),
+    })
+
     const deployResult = await pipedream.deployTrigger({
       externalUserId,
       triggerId: componentId,
       configuredProps,
+      dynamicPropsId: reload.dynamicProps?.id,
       webhookUrl: gatewayPath(`/webhook/integration/${triggerUuid}`),
     })
 

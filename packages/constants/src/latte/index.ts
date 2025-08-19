@@ -9,6 +9,7 @@ export enum LatteTool {
 
   listPrompts = 'list_prompts',
   readPrompt = 'read_prompt',
+  writePrompt = 'write_prompt',
   editProject = 'edit_project',
 
   listProviders = 'list_providers',
@@ -21,5 +22,7 @@ export enum LatteTool {
   listIntegrationTriggers = 'list_integration_triggers',
   listExistingTriggers = 'list_existing_triggers',
 
+  getFullTriggerSchema = 'get_full_trigger_schema',
+  validateTriggerSchema = 'validate_trigger_schema',
   triggerActions = 'trigger_actions',
 }

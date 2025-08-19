@@ -9,7 +9,7 @@ import { updatePipedreamTrigger } from './triggers'
 import { Result } from '../../../lib/Result'
 import { IntegrationTriggerConfiguration } from '@latitude-data/constants/documentTriggers'
 import * as appsModule from './apps'
-import * as componentsModule from './components'
+import * as componentsModule from './components/fillConfiguredProps'
 import * as triggersModule from './triggers'
 import { BadRequestError, NotFoundError } from '@latitude-data/constants/errors'
 import * as factories from '../../../tests/factories'
@@ -19,6 +19,7 @@ const mockPipedreamClient = {
   updateTrigger: vi.fn(),
   deleteTrigger: vi.fn(),
   deployTrigger: vi.fn(),
+  reloadComponentProps: vi.fn(),
 }
 
 vi.mock('@pipedream/sdk', () => ({
@@ -417,6 +418,9 @@ describe('updatePipedreamTrigger', () => {
     })
 
     it('deletes old trigger and deploys new one successfully', async () => {
+      mockPipedreamClient.reloadComponentProps.mockResolvedValue(
+        Result.ok({ prop1: 'filledValue1' }),
+      )
       const result = await updatePipedreamTrigger({
         workspace,
         trigger: originalTrigger as Extract<
@@ -464,6 +468,9 @@ describe('updatePipedreamTrigger', () => {
 
     it('returns error when deploy new trigger fails', async () => {
       const deployError = new Error('Deploy failed')
+      mockPipedreamClient.reloadComponentProps.mockResolvedValue(
+        Result.ok({ prop1: 'filledValue1' }),
+      )
       mockPipedreamClient.deployTrigger.mockRejectedValue(deployError)
 
       const result = await updatePipedreamTrigger({
