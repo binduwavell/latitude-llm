@@ -99,7 +99,54 @@ export async function ai({
     ...DEFAULT_AI_SDK_PROVIDER,
     ...(aiSdkProvider || {}),
   }
+  
+  // Debug logging for AI requests
+  const debugAI = process.env.DEBUG_AI === 'true'
+  
   try {
+    if (debugAI) {
+      console.log('\n=== AI Request Debug Info ===')
+      console.log('Provider:', provider.provider)
+      console.log('Model:', originalConfig.model)
+      console.log('Messages count:', originalMessages.length)
+      console.log('Messages:', JSON.stringify(originalMessages.map(msg => ({
+        role: msg.role,
+        content: Array.isArray(msg.content) ? msg.content.map(c => {
+          const content: any = { type: c.type }
+          
+          if (c.type === 'text') {
+            content.text = (c as any).text?.substring(0, 100) + (((c as any).text?.length > 100) ? '...' : '')
+          } else if (c.type === 'image') {
+            const imageData = (c as any).image
+            content.imageInfo = {
+              present: !!imageData,
+              dataType: typeof imageData,
+              isURL: typeof imageData === 'string' && (imageData.startsWith('http') || imageData.startsWith('data:')),
+              isBuffer: imageData instanceof Buffer,
+              isUint8Array: imageData instanceof Uint8Array,
+              size: imageData?.length || imageData?.byteLength || (typeof imageData === 'string' ? imageData.length : 0),
+              preview: typeof imageData === 'string' ? 
+                (imageData.startsWith('http') || imageData.startsWith('data:')) ? 
+                  imageData : // Show full URL or data URI
+                  imageData.substring(0, 100) + '...' : // Only truncate non-URLs
+                'Binary data'
+            }
+          } else if (c.type === 'file') {
+            const fileData = (c as any).file
+            content.fileInfo = {
+              present: !!fileData,
+              mimeType: (c as any).mimeType,
+              dataType: typeof fileData,
+              size: fileData?.length || fileData?.byteLength || (typeof fileData === 'string' ? fileData.length : 0)
+            }
+          }
+          
+          return content
+        }) : typeof msg.content === 'string' ? msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : '') : msg.content
+      })), null, 2))
+      console.log('Config:', JSON.stringify(originalConfig, null, 2))
+    }
+
     const rule = applyAllRules({
       providerType: provider.provider,
       messages: originalMessages,
@@ -146,6 +193,46 @@ export async function ai({
     const useSchema = schema && !!output && output !== 'no-schema'
     const resultType: StreamType = useSchema ? 'object' : 'text'
 
+    if (debugAI) {
+      console.log('\n=== Converted Messages for Provider ===')
+      console.log('Messages after rules:', JSON.stringify(messages.map((msg: any) => ({
+        role: msg.role,
+        content: Array.isArray(msg.content) ? msg.content.map((c: any) => {
+          const content: any = { type: c.type }
+          
+          if (c.type === 'text') {
+            content.text = c.text?.substring(0, 100) + ((c.text?.length > 100) ? '...' : '')
+          } else if (c.type === 'image') {
+            const imageData = c.image
+            content.imageInfo = {
+              present: !!imageData,
+              dataType: typeof imageData,
+              isURL: typeof imageData === 'string' && (imageData.startsWith('http') || imageData.startsWith('data:')),
+              isBuffer: imageData instanceof Buffer,
+              isUint8Array: imageData instanceof Uint8Array,
+              size: imageData?.length || imageData?.byteLength || (typeof imageData === 'string' ? imageData.length : 0),
+              preview: typeof imageData === 'string' ? 
+                (imageData.startsWith('http') || imageData.startsWith('data:')) ? 
+                  imageData : // Show full URL or data URI
+                  imageData.substring(0, 100) + '...' : // Only truncate non-URLs
+                'Binary data'
+            }
+          } else if (c.type === 'file') {
+            const fileData = c.data || c.file  // After conversion, it might be 'data' instead of 'file'
+            content.fileInfo = {
+              present: !!fileData,
+              mimeType: c.mimeType,
+              dataType: typeof fileData,
+              size: fileData?.length || fileData?.byteLength || (typeof fileData === 'string' ? fileData.length : 0)
+            }
+          }
+          
+          return content
+        }) : typeof msg.content === 'string' ? msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : '') : msg.content
+      })), null, 2))
+      console.log('\n=== Sending to Provider:', provider.provider, 'Model:', config.model, '===')
+    }
+
     const result = streamText({
       ...omit(config, ['schema']),
       model: languageModel,
@@ -161,6 +248,19 @@ export async function ai({
         : undefined,
     })
 
+    if (debugAI) {
+      // Log response metadata when available
+      result.providerMetadata.then(metadata => {
+        console.log('\n=== Provider Response Metadata ===')
+        console.log(JSON.stringify(metadata, null, 2))
+      }).catch(() => {})
+      
+      result.finishReason.then(reason => {
+        console.log('\n=== Finish Reason ===')
+        console.log(reason)
+      }).catch(() => {})
+    }
+
     return Result.ok({
       type: resultType,
       providerName: providerType,
@@ -175,6 +275,10 @@ export async function ai({
       response: result.response,
     })
   } catch (e) {
+    if (debugAI) {
+      console.log('\n=== AI Request Error ===')
+      console.log('Error:', e)
+    }
     return handleAICallAPIError(e)
   }
 }
