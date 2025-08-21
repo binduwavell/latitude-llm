@@ -131,7 +131,12 @@ services:
       - web
 
   migrations:
-    image: ghcr.io/latitude-dev/migrations:latest
+    # image: ghcr.io/latitude-dev/migrations:latest
+    build:
+      args:
+        - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
+      context: .
+      dockerfile: packages/core/docker/Dockerfile
     container_name: latitude-llm-migrations
     platform: linux/amd64
     env_file:
@@ -147,7 +152,10 @@ services:
       - web
 
   gateway:
-    image: ghcr.io/latitude-dev/gateway:latest
+    # image: ghcr.io/latitude-dev/gateway:latest
+    build:
+      context: .
+      dockerfile: apps/gateway/docker/Dockerfile
     restart: always
     container_name: latitude-llm-gateway
     platform: linux/amd64
@@ -177,7 +185,10 @@ services:
       - web
 
   workers:
-    image: ghcr.io/latitude-dev/workers:latest
+    # image: ghcr.io/latitude-dev/workers:latest
+    build:
+      context: .
+      dockerfile: apps/workers/docker/Dockerfile
     restart: always
     container_name: latitude-llm-workers
     platform: linux/amd64
@@ -193,7 +204,10 @@ services:
       - web
 
   websockets:
-    image: ghcr.io/latitude-dev/websockets:latest
+    # image: ghcr.io/latitude-dev/websockets:latest
+    build:
+      context: .
+      dockerfile: apps/websockets/docker/Dockerfile
     restart: always
     container_name: latitude-llm-websockets
     platform: linux/amd64
