@@ -24,5 +24,10 @@ export function isPublicPath(pathname: string) {
     PUBLIC_ROOT_PATHS.share,
   ]
 
+  // Allow workspace file URLs to be accessed without authentication (for LLM providers)
+  if (pathname.match(/^\/files\/workspaces\/\d+\/files\//)) {
+    return true
+  }
+
   return publicPaths.some((publicPath) => pathname.startsWith(publicPath))
 }

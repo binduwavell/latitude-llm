@@ -39,7 +39,8 @@ export const config = {
      * - favicon.ico, sitemap.xml, robots.txt (metadata files)
      * - placeholder.png (placeholder image)
      * - uploads (public uploads folder)
+     * - files (workspace files for LLM access)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|favicon.svg|sitemap.xml|robots.txt|placeholder.png|logodark.png|uploads).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|favicon.svg|sitemap.xml|robots.txt|placeholder.png|logodark.png|uploads|files).*)',
   ],
 }
