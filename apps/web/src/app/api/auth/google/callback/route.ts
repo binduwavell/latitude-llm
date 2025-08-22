@@ -83,7 +83,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     // 5. Redirect user
     const returnTo = cookiesStore.get('returnTo')?.value ?? null
     if (!returnTo || !isLatitudeUrl(returnTo)) {
-      return NextResponse.redirect(ROUTES.dashboard.root)
+      return NextResponse.redirect(new URL(ROUTES.dashboard.root, request.url))
     }
 
     return NextResponse.redirect(returnTo)
