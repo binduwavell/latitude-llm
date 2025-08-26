@@ -56,6 +56,7 @@ export * from './models/experiments'
 // Public sharing & Triggers
 export * from './models/publishedDocuments'
 export * from './models/documentTriggers'
+export * from './models/documentTriggerEvents'
 
 // Integrations
 export * from './models/integrations'
@@ -71,6 +72,7 @@ export * from './models/events'
 // Latte
 export * from './models/latteThreads'
 export * from './models/latteThreadCheckpoints'
+export * from './models/latteRequests'
 
 // Feature toggles
 export * from './models/features'

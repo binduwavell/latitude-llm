@@ -1,9 +1,6 @@
 import { useCallback } from 'react'
 import useDocumentTriggers from '$/stores/documentTriggers'
-import {
-  DocumentTriggerType,
-  EMAIL_TRIGGER_DOMAIN,
-} from '@latitude-data/constants'
+import { DocumentTriggerType } from '@latitude-data/constants'
 import { EmailTriggerConfiguration } from '@latitude-data/constants/documentTriggers'
 import {
   useCurrentCommit,
@@ -24,11 +21,12 @@ export function EmailTrigger({
 }) {
   const { project } = useCurrentProject()
   const documentSelection = useDocumentSelection()
-  const { isHead } = useCurrentCommit()
+  const { isHead, commit } = useCurrentCommit()
   const document = documentSelection.document
   const { create, isCreating } = useDocumentTriggers(
     {
       projectId: project.id,
+      commitUuid: commit.uuid,
     },
     {
       onCreated: (trigger) => {
@@ -44,18 +42,12 @@ export function EmailTrigger({
 
       create({
         documentUuid,
-        trigger: {
-          type: DocumentTriggerType.Email,
-          configuration: config,
-        },
+        triggerType: DocumentTriggerType.Email,
+        configuration: config,
       })
     },
     [create, documentUuid],
   )
-
-  const triggerEmailAddress = document
-    ? `${document.documentUuid}@${EMAIL_TRIGGER_DOMAIN}`
-    : null
 
   return (
     <TriggerWrapper
@@ -67,10 +59,9 @@ export function EmailTrigger({
         document={document}
         onSelectDocument={documentSelection.onSelectDocument}
       />
-      {triggerEmailAddress && document ? (
+      {document ? (
         <EmailTriggerConfig
           document={document}
-          triggerEmailAddress={triggerEmailAddress}
           onCreateEmailTrigger={onCreateEmailTrigger}
           isCreating={isCreating}
           disabled={disabled}

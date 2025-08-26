@@ -2,6 +2,7 @@ import { type InferInsertModel, type InferSelectModel } from 'drizzle-orm'
 
 import {
   DocumentLog,
+  DocumentTriggerType,
   EvaluationResultDto,
   ExperimentScores,
   IntegrationType,
@@ -14,7 +15,11 @@ import {
   EvaluationType,
   EvaluationV2,
 } from '../constants'
-import { DocumentTriggerWithConfiguration } from '@latitude-data/constants/documentTriggers'
+import {
+  DocumentTriggerConfiguration,
+  DocumentTriggerDeploymentSettings,
+  DocumentTriggerEventPayload,
+} from '@latitude-data/constants/documentTriggers'
 import { IntegrationConfiguration } from '../services/integrations/helpers/schema'
 import { connectedEvaluations } from './legacyModels/connectedEvaluations'
 import { evaluationAdvancedTemplates } from './legacyModels/evaluationAdvancedTemplates'
@@ -51,8 +56,10 @@ import { users } from './models/users'
 import { workspaces } from './models/workspaces'
 import { latteThreads } from './models/latteThreads'
 import { latteThreadCheckpoints } from './models/latteThreadCheckpoints'
+import { latteRequests } from './models/latteRequests'
 import { features } from './models/features'
 import { workspaceFeatures } from './models/workspaceFeatures'
+import { documentTriggerEvents } from './models/documentTriggerEvents'
 
 export type {
   DocumentLog,
@@ -128,6 +135,8 @@ export type LatteThread = InferSelectModel<typeof latteThreads>
 export type LatteThreadCheckpoint = InferSelectModel<
   typeof latteThreadCheckpoints
 >
+export type LatteRequest = InferSelectModel<typeof latteRequests>
+
 export type Feature = InferSelectModel<typeof features>
 export type WorkspaceFeature = InferSelectModel<typeof workspaceFeatures>
 
@@ -269,8 +278,23 @@ export type PipedreamIntegrationWithCounts =
   }
 
 type _DocumentTrigger = InferSelectModel<typeof documentTriggers>
-export type DocumentTrigger = Omit<_DocumentTrigger, 'configuration' | 'type'> &
-  DocumentTriggerWithConfiguration
+export type DocumentTrigger<
+  T extends DocumentTriggerType = DocumentTriggerType,
+> = Omit<
+  _DocumentTrigger,
+  'triggerType' | 'configuration' | 'deploymentSettings'
+> & {
+  triggerType: T
+  configuration: DocumentTriggerConfiguration<T>
+  deploymentSettings: DocumentTriggerDeploymentSettings<T> | null
+}
+
+export type DocumentTriggerEvent<
+  T extends DocumentTriggerType = DocumentTriggerType,
+> = InferSelectModel<typeof documentTriggerEvents> & {
+  triggerType: T
+  payload: DocumentTriggerEventPayload<T>
+}
 
 export type ResultWithEvaluation = {
   result: EvaluationResultDto

@@ -1,6 +1,5 @@
 import { googleProvider } from '$/services/auth'
 import { setSession } from '$/services/auth/setSession'
-import { ROUTES } from '$/services/routes'
 import { isLatitudeUrl } from '@latitude-data/constants'
 import { OAuthProvider } from '@latitude-data/core/schema'
 import { findOrCreateUserFromOAuth } from '@latitude-data/core/services/auth/findOrCreateUserFromOAuth'

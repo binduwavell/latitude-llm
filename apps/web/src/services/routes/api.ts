@@ -108,9 +108,6 @@ export const API_ROUTES = {
         stats: {
           root: `${projectRoot}/stats`,
         },
-        triggers: {
-          root: `${projectRoot}/triggers`,
-        },
         commits: {
           root: `${projectRoot}/commits`,
           detail: (commitUuid: string) => ({
@@ -161,6 +158,16 @@ export const API_ROUTES = {
                         root: `${documentRoot}/evaluations/results/document-logs`,
                       },
                     },
+                  },
+                }
+              },
+            },
+            triggers: {
+              root: `${projectRoot}/commits/${commitUuid}/triggers`,
+              detail: (triggerUuid: string) => {
+                return {
+                  triggerEvents: {
+                    root: `${projectRoot}/commits/${commitUuid}/triggers/${triggerUuid}/triggerEvents`,
                   },
                 }
               },
@@ -383,6 +390,9 @@ export const API_ROUTES = {
     },
   },
   latte: {
+    usage: {
+      root: `/api/latte/usage`,
+    },
     debug: {
       versions: {
         root: `/api/latte/debug/versions`,

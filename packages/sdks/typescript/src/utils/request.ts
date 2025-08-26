@@ -5,6 +5,7 @@ import {
   UrlParams,
 } from '$sdk/utils/types'
 import { SDK_VERSION } from '$sdk/utils/version'
+
 import nodeFetch, { Response } from 'node-fetch'
 
 const MAX_RETRIES = 2

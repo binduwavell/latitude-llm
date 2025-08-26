@@ -1,3 +1,4 @@
+import { tokenizeMessages, tokenizeText } from '$/lib/tokenize'
 import { ChainEvent, ChainEventTypes } from '@latitude-data/constants'
 import {
   Message,
@@ -7,8 +8,19 @@ import {
 } from '@latitude-data/constants/legacyCompiler'
 import { LanguageModelUsage } from 'ai'
 import { ParsedEvent } from 'eventsource-parser/stream'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useProviderEventHandler } from './useProviderEventHandler'
+
+const EMPTY_USAGE = (): LanguageModelUsage => ({
+  promptTokens: 0,
+  completionTokens: 0,
+  totalTokens: 0,
+})
+
+type LanguageModelUsageDelta = Pick<
+  LanguageModelUsage,
+  'promptTokens' | 'completionTokens'
+>
 
 function buildMessage({ input }: { input: string | ToolMessage[] }) {
   if (typeof input === 'string') {
@@ -47,14 +59,102 @@ export function usePlaygroundChat({
   const [error, setError] = useState<Error | undefined>()
   const [isLoading, setIsLoading] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
-  const [unresponedToolCalls, setUnresponedToolCalls] = useState<ToolCall[]>([])
-  const [usage, setUsage] = useState<LanguageModelUsage>({
-    promptTokens: 0,
-    completionTokens: 0,
-    totalTokens: 0,
-  })
+  const [unrespondedToolCalls, setUnrespondedToolCalls] = useState<ToolCall[]>([]) // prettier-ignore
+  const [usage, setUsage] = useState<LanguageModelUsage>(EMPTY_USAGE())
+  const [usageDelta, setUsageDelta] = useState<LanguageModelUsageDelta>(EMPTY_USAGE()) // prettier-ignore
+  const usageDeltaRef = useRef<LanguageModelUsageDelta>(EMPTY_USAGE())
   const [runningLatitudeTools, setRunningLatitudeTools] = useState<number>(0)
   const [wakingUpIntegration, setWakingUpIntegration] = useState<string>()
+  const [provider, setProvider] = useState<string>()
+  const [model, setModel] = useState<string>()
+  const [duration, setDuration] = useState<number>(0)
+  const timerRef = useRef<number | null>(null)
+  const startedAtRef = useRef<number | null>(null)
+  const durationAccRef = useRef<number>(0)
+
+  const incrementUsage = useCallback(
+    (incr: { promptTokens?: number; completionTokens?: number }) =>
+      setUsage((prev) => {
+        const promptTokens = Math.max(0, Math.ceil(prev.promptTokens + (incr.promptTokens ?? 0))) // prettier-ignore
+        const completionTokens = Math.max(0, Math.ceil(prev.completionTokens + (incr.completionTokens ?? 0))) // prettier-ignore
+        const totalTokens = promptTokens + completionTokens
+        return { promptTokens, completionTokens, totalTokens }
+      }),
+    [setUsage],
+  )
+
+  const incrementUsageDelta = useCallback(
+    (incr: { promptTokens?: number; completionTokens?: number }) => {
+      incrementUsage({
+        promptTokens: incr.promptTokens,
+        completionTokens: incr.completionTokens,
+      })
+      setUsageDelta((prev) => {
+        const promptTokens =  Math.max(0, prev.promptTokens + (incr.promptTokens ?? 0)) // prettier-ignore
+        const completionTokens = Math.max(0, prev.completionTokens + (incr.completionTokens ?? 0)) // prettier-ignore
+        return { promptTokens, completionTokens }
+      })
+    },
+    [incrementUsage, setUsageDelta],
+  )
+
+  const resetUsageDelta = useCallback(() => {
+    usageDeltaRef.current = EMPTY_USAGE()
+    setUsageDelta(EMPTY_USAGE())
+  }, [setUsageDelta])
+
+  useEffect(() => {
+    usageDeltaRef.current = usageDelta
+  }, [usageDelta])
+
+  const syncUsage = useCallback(
+    (usage: LanguageModelUsage) => {
+      incrementUsage({
+        promptTokens: usage.promptTokens - usageDeltaRef.current.promptTokens,
+        completionTokens:
+          usage.completionTokens - usageDeltaRef.current.completionTokens,
+      })
+      resetUsageDelta()
+    },
+    [incrementUsage, resetUsageDelta],
+  )
+
+  const startTimer = useCallback(() => {
+    if (startedAtRef.current) return
+    startedAtRef.current = Date.now()
+    durationAccRef.current = duration
+    timerRef.current = window.setInterval(() => {
+      if (!startedAtRef.current) return
+      const elapsed = Date.now() - startedAtRef.current
+      setDuration(durationAccRef.current + elapsed)
+    }, 100)
+  }, [duration])
+
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current)
+    }
+    timerRef.current = null
+    startedAtRef.current = null
+  }, [])
+
+  const resetTimer = useCallback(() => {
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current)
+    }
+    timerRef.current = null
+    startedAtRef.current = null
+    durationAccRef.current = 0
+    setDuration(0)
+  }, [setDuration])
+
+  // Note: cleaning up timer on unmount
+  useEffect(() => resetTimer, [resetTimer])
+
+  // Note: stopping timer when on pause
+  useEffect(() => {
+    if (!isLoading) stopTimer()
+  }, [isLoading, stopTimer])
 
   const addMessages = useCallback(
     (m: Message[]) => {
@@ -77,33 +177,75 @@ export function usePlaygroundChat({
   // Use the provider event handler hook
   const { handleProviderEvent } = useProviderEventHandler({
     setMessages,
-    setUnresponedToolCalls,
+    setUnrespondedToolCalls,
     setRunningLatitudeTools,
     addMessages,
+    incrementUsageDelta,
   })
 
   const handleLatitudeEvent = useCallback(
     (data: ChainEvent['data']) => {
+      if (data.type === ChainEventTypes.ChainStarted) {
+        startTimer()
+        resetUsageDelta()
+      }
+
       if (data.type === ChainEventTypes.StepStarted) {
         setMessages(data.messages)
+        incrementUsageDelta({
+          promptTokens: tokenizeMessages(data.messages),
+        })
       }
+
+      if (data.type === ChainEventTypes.ProviderStarted) {
+        setProvider(data.config?.provider as string)
+        setModel(data.config?.model as string)
+      }
+
       if (data.type === ChainEventTypes.ProviderCompleted) {
-        setUsage(data.tokenUsage)
+        // Note: for some reason some providers return an empty token usage,
+        // so instead of showing 0 tokens, keep the approximation as is
+        if (data.tokenUsage.totalTokens) syncUsage(data.tokenUsage)
       }
 
       if (data.type === ChainEventTypes.ToolsStarted) {
         setRunningLatitudeTools(data.tools.length)
       }
 
+      if (data.type === ChainEventTypes.ToolResult) {
+        incrementUsageDelta({
+          promptTokens: tokenizeText(
+            data.toolName + JSON.stringify(data.result),
+          ),
+        })
+      }
+
       if (data.type === ChainEventTypes.StepCompleted) {
         setRunningLatitudeTools(0)
       }
 
+      if (data.type === ChainEventTypes.ChainCompleted) {
+        resetUsageDelta()
+        stopTimer()
+      }
+
       if (data.type === ChainEventTypes.ChainError) {
+        resetUsageDelta()
+        stopTimer()
         throw data.error
       }
     },
-    [setUsage, setRunningLatitudeTools],
+    [
+      setMessages,
+      resetUsageDelta,
+      incrementUsageDelta,
+      syncUsage,
+      setProvider,
+      setModel,
+      setRunningLatitudeTools,
+      startTimer,
+      stopTimer,
+    ],
   )
 
   const handleGenericStreamError = useCallback(
@@ -209,10 +351,10 @@ export function usePlaygroundChat({
           )
           return [...acc, ...toolResponseContents.map((c) => c.toolCallId)]
         }, [] as string[])
-        respondedToolCalls = unresponedToolCalls.filter((toolCall) => {
+        respondedToolCalls = unrespondedToolCalls.filter((toolCall) => {
           return respondedToolCallIds.includes(toolCall.id)
         })
-        setUnresponedToolCalls((prev) =>
+        setUnrespondedToolCalls((prev) =>
           prev.filter((unrespondedToolCall) => {
             return !respondedToolCallIds.includes(unrespondedToolCall.id)
           }),
@@ -237,7 +379,7 @@ export function usePlaygroundChat({
     [
       addMessagesFn,
       documentLogUuid,
-      unresponedToolCalls,
+      unrespondedToolCalls,
       handleStream,
       addMessages,
     ],
@@ -257,24 +399,28 @@ export function usePlaygroundChat({
 
   const reset = useCallback(() => {
     setMessages([])
-    setUnresponedToolCalls([])
-    setUsage({
-      promptTokens: 0,
-      completionTokens: 0,
-      totalTokens: 0,
-    })
+    setUnrespondedToolCalls([])
+    setUsage(EMPTY_USAGE())
+    resetUsageDelta()
     setDocumentLogUuid(undefined)
     setError(undefined)
     setIsLoading(false)
     setWakingUpIntegration(undefined)
+    setProvider(undefined)
+    setModel(undefined)
+    resetTimer()
   }, [
     setMessages,
-    setUnresponedToolCalls,
+    setUnrespondedToolCalls,
     setUsage,
+    resetUsageDelta,
     setDocumentLogUuid,
     setError,
     setIsLoading,
     setWakingUpIntegration,
+    setProvider,
+    setModel,
+    resetTimer,
   ])
 
   return useMemo(
@@ -286,9 +432,12 @@ export function usePlaygroundChat({
       runningLatitudeTools,
       start,
       submitUserMessage,
-      unresponedToolCalls,
+      unrespondedToolCalls,
       usage,
       wakingUpIntegration,
+      provider,
+      model,
+      duration,
       reset,
     }),
     [
@@ -300,9 +449,12 @@ export function usePlaygroundChat({
       runningLatitudeTools,
       start,
       submitUserMessage,
-      unresponedToolCalls,
+      unrespondedToolCalls,
       usage,
       wakingUpIntegration,
+      provider,
+      model,
+      duration,
       reset,
     ],
   )
