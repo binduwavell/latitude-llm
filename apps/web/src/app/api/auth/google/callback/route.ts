@@ -83,10 +83,12 @@ export async function GET(request: NextRequest): Promise<Response> {
     // 5. Redirect user
     const returnTo = cookiesStore.get('returnTo')?.value ?? null
     if (!returnTo || !isLatitudeUrl(returnTo)) {
-      return NextResponse.redirect(new URL(ROUTES.dashboard.root, request.url))
+      return NextResponse.redirect(env.APP_URL)
     }
 
-    return NextResponse.redirect(returnTo)
+    return NextResponse.redirect(
+      returnTo.startsWith('/') ? env.APP_URL + returnTo : returnTo,
+    )
   } catch (e) {
     console.error('Google OAuth Callback Error:', e)
     if (e instanceof OAuth2RequestError) {
