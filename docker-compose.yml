@@ -103,7 +103,7 @@ services:
       - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
     ports:
       - '8081:8080'
-    image: latitude/web:latest
+    image: latitude-dev/web:latest
     build:
       args:
         - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
@@ -132,6 +132,7 @@ services:
 
   migrations:
     # image: ghcr.io/latitude-dev/migrations:latest
+    image: latitude-dev/migrations:latest
     build:
       args:
         - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
@@ -153,6 +154,7 @@ services:
 
   gateway:
     # image: ghcr.io/latitude-dev/gateway:latest
+    image: latitude-dev/gateway:latest
     build:
       context: .
       dockerfile: apps/gateway/docker/Dockerfile
@@ -186,6 +188,7 @@ services:
 
   workers:
     # image: ghcr.io/latitude-dev/workers:latest
+    image: latitude-dev/workers:latest
     build:
       context: .
       dockerfile: apps/workers/docker/Dockerfile
@@ -205,6 +208,7 @@ services:
 
   websockets:
     # image: ghcr.io/latitude-dev/websockets:latest
+    image: latitude-dev/websockets:latest
     build:
       context: .
       dockerfile: apps/websockets/docker/Dockerfile
